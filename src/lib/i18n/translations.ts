@@ -1,0 +1,258 @@
+export type Locale = "en" | "ar";
+export type PdfLanguage = "en" | "ar";
+
+export const translations = {
+  en: {
+    appTagline: "Motor Insurance",
+    appTitle: "Quote Dashboard",
+    requests: "Requests",
+    requestsDesc:
+      "Create a motor insurance quotation step by step, then download the PDF in English or Arabic.",
+    noRequests: "No requests yet. Start your first quotation.",
+    newRequest: "New Request",
+    close: "Close",
+    cancel: "Cancel",
+    back: "Back",
+    next: "Next",
+    review: "Review",
+    downloadEn: "Download PDF (English)",
+    downloadAr: "Download PDF (Arabic)",
+    generating: "Generating PDF...",
+    stepOf: "Step {current} of {total}",
+    language: "Language",
+    english: "English",
+    arabic: "Arabic",
+    autoFilled: "Filled automatically. You can edit it.",
+    premiumSummary: "Premium summary",
+    total: "Total",
+    vat: "VAT (5%)",
+    totalVat: "Total + VAT",
+    reviewTitle: "Review & Download",
+    reviewDesc: "Verify your details, then choose the PDF language.",
+    yes: "Yes",
+    no: "No",
+    steps: {
+      quotation: { title: "Quotation & Premium", desc: "Quote header and premium summary." },
+      insured: { title: "Insured Details", desc: "Personal information of the insured." },
+      vehicle: { title: "Vehicle Details", desc: "Vehicle identification and valuation." },
+      benefits: { title: "Benefits Coverage", desc: "Choose covered benefits (default: Yes)." },
+      covers: { title: "Optional & Deductibles", desc: "Optional add-ons and deductible." },
+    },
+    sections: {
+      quotation: "Quotation & Premium",
+      insured: "Insured Details",
+      vehicle: "Vehicle Details",
+      benefits: "Benefits Coverage",
+      optional: "Optional & Deductibles",
+    },
+    fields: {
+      quotationNo: "Quotation No.",
+      quoteIssueDate: "Quote Issue Date",
+      insuranceProduct: "Insurance Product",
+      insurancePeriod: "Insurance Period",
+      broker: "Broker",
+      basicPremium: "Basic Premium (AED)",
+      additionalCovers: "Additional Covers (AED)",
+      insuredName: "Insured Name",
+      mobileNo: "Mobile No.",
+      dateOfBirth: "Date of Birth",
+      emailId: "Email ID",
+      ncdYears: "NCD (years)",
+      tcfNo: "TCF No.",
+      nationality: "Nationality",
+      insuredType: "Insured Type",
+      regLocPlate: "Reg loc, Plate Dtls",
+      manufacturingYear: "Manufacturing Year",
+      make: "Make",
+      trimBodyType: "Trim / Body Type",
+      cylinders: "No. Of. Cylinders",
+      chassisNo: "Chassis No.",
+      seatingCapacity: "Seating Capacity",
+      gccSpecification: "GCC Specification",
+      vehicleValue: "Vehicle Value (AED)",
+      repairType: "Repair Type",
+      hireCarCovered: "Hire Car for OD (7 Days)",
+      hireCarPremium: "Hire Car Premium (AED)",
+      agencyRepairCovered: "Agency Repair cover",
+      basicDeductible: "Basic Deductible",
+      lossOrDamage: "Loss or Damage",
+      fireTheft: "Fire and Theft",
+      thirdPartyBodily: "Third Party Bodily Injury",
+      thirdPartyProperty: "Third Party Property Damage",
+      pabDriver: "PAB for Driver",
+      pabPassengers: "PAB for Passengers",
+      pabFamily: "PAB for Family & Friends",
+      geographicalArea: "Geographical Area Extension",
+      stormFlood: "Storm, Flood, Riot & Strike",
+      offRoad: "Off Road Cover",
+      ambulance: "Ambulance Services",
+      emergencyMedical: "Emergency Medical Exp.",
+      windscreen: "Windscreen",
+      personalEffects: "Personal Effects",
+      roadsideAssistance: "Roadside Assistance",
+    },
+    options: {
+      individual: "Individual",
+      company: "Company",
+      agency: "Agency",
+      nonAgency: "Non-Agency",
+    },
+    errors: {
+      required: "{field} is required.",
+      invalidFormat: "{field} format is invalid.",
+      minValue: "{field} must be at least {min}.",
+      maxValue: "{field} must not exceed {max}.",
+      maxLength: "{field} must not exceed {max} characters.",
+      digitsOnly: "{field} must contain digits only.",
+      lettersOnly: "{field} must contain letters only.",
+      invalidEmail: "Please enter a valid email address.",
+      invalidMobile: "Mobile must be 10 digits starting with 05.",
+      invalidDate: "Date must be DD/MM/YYYY.",
+      invalidYear: "Enter a valid 4-digit year.",
+      invalidChassis: "Chassis number must be 17 alphanumeric characters.",
+    },
+  },
+  ar: {
+    appTagline: "تأمين المركبات",
+    appTitle: "لوحة عروض الأسعار",
+    requests: "الطلبات",
+    requestsDesc:
+      "أنشئ عرض سعر تأمين مركبات خطوة بخطوة، ثم حمّل ملف PDF بالعربية أو الإنجليزية.",
+    noRequests: "لا توجد طلبات بعد. ابدأ أول عرض سعر.",
+    newRequest: "طلب جديد",
+    close: "إغلاق",
+    cancel: "إلغاء",
+    back: "رجوع",
+    next: "التالي",
+    review: "مراجعة",
+    downloadEn: "تحميل PDF (إنجليزي)",
+    downloadAr: "تحميل PDF (عربي)",
+    generating: "جاري إنشاء PDF...",
+    stepOf: "الخطوة {current} من {total}",
+    language: "اللغة",
+    english: "English",
+    arabic: "العربية",
+    autoFilled: "يُملأ تلقائياً. يمكنك تعديله.",
+    premiumSummary: "ملخص الأقساط",
+    total: "الإجمالي",
+    vat: "ضريبة القيمة المضافة (5%)",
+    totalVat: "الإجمالي + الضريبة",
+    reviewTitle: "مراجعة وتحميل",
+    reviewDesc: "تحقق من البيانات ثم اختر لغة ملف PDF.",
+    yes: "نعم",
+    no: "لا",
+    steps: {
+      quotation: { title: "العرض والأقساط", desc: "بيانات رأس العرض وملخص الأقساط." },
+      insured: { title: "بيانات المؤمن", desc: "المعلومات الشخصية للمؤمن عليه." },
+      vehicle: { title: "بيانات المركبة", desc: "تفاصيل المركبة وتقييمها." },
+      benefits: { title: "التغطيات", desc: "اختر التغطيات المشمولة (الافتراضي: نعم)." },
+      covers: { title: "تغطيات اختيارية", desc: "إضافات اختيارية والخصم." },
+    },
+    sections: {
+      quotation: "العرض والأقساط",
+      insured: "بيانات المؤمن",
+      vehicle: "بيانات المركبة",
+      benefits: "التغطيات",
+      optional: "تغطيات اختيارية",
+    },
+    fields: {
+      quotationNo: "رقم العرض",
+      quoteIssueDate: "تاريخ إصدار العرض",
+      insuranceProduct: "نوع التأمين",
+      insurancePeriod: "مدة التأمين",
+      broker: "الوسيط",
+      basicPremium: "القسط الأساسي (درهم)",
+      additionalCovers: "تغطيات إضافية (درهم)",
+      insuredName: "اسم المؤمن",
+      mobileNo: "رقم الجوال",
+      dateOfBirth: "تاريخ الميلاد",
+      emailId: "البريد الإلكتروني",
+      ncdYears: "سنوات عدم المطالبة",
+      tcfNo: "رقم TCF",
+      nationality: "الجنسية",
+      insuredType: "نوع المؤمن",
+      regLocPlate: "الإمارة واللوحة",
+      manufacturingYear: "سنة الصنع",
+      make: "الشركة المصنعة",
+      trimBodyType: "الفئة / نوع الهيكل",
+      cylinders: "عدد الأسطوانات",
+      chassisNo: "رقم الشاصي",
+      seatingCapacity: "سعة المقاعد",
+      gccSpecification: "مواصفات خليجية",
+      vehicleValue: "قيمة المركبة (درهم)",
+      repairType: "نوع الإصلاح",
+      hireCarCovered: "سيارة بديلة (7 أيام)",
+      hireCarPremium: "قسط السيارة البديلة (درهم)",
+      agencyRepairCovered: "تغطية إصلاح الوكالة",
+      basicDeductible: "الخصم الأساسي",
+      lossOrDamage: "الضرر أو الخسارة",
+      fireTheft: "الحريق والسرقة",
+      thirdPartyBodily: "إصابة طرف ثالث",
+      thirdPartyProperty: "ممتلكات طرف ثالث",
+      pabDriver: "حوادث شخصية للسائق",
+      pabPassengers: "حوادث شخصية للركاب",
+      pabFamily: "حوادث شخصية للعائلة",
+      geographicalArea: "توسعة المنطقة الجغرافية",
+      stormFlood: "عواصف وفيضانات",
+      offRoad: "تغطية خارج الطريق",
+      ambulance: "خدمات الإسعاف",
+      emergencyMedical: "مصاريف طبية طارئة",
+      windscreen: "الزجاج الأمامي",
+      personalEffects: "الممتلكات الشخصية",
+      roadsideAssistance: "المساعدة على الطريق",
+    },
+    options: {
+      individual: "فرد",
+      company: "شركة",
+      agency: "وكالة",
+      nonAgency: "خارج الوكالة",
+    },
+    errors: {
+      required: "{field} مطلوب.",
+      invalidFormat: "صيغة {field} غير صحيحة.",
+      minValue: "{field} يجب أن يكون {min} على الأقل.",
+      maxValue: "{field} يجب ألا يتجاوز {max}.",
+      maxLength: "{field} يجب ألا يتجاوز {max} حرفاً.",
+      digitsOnly: "{field} يجب أن يحتوي على أرقام فقط.",
+      lettersOnly: "{field} يجب أن يحتوي على أحرف فقط.",
+      invalidEmail: "يرجى إدخال بريد إلكتروني صحيح.",
+      invalidMobile: "الجوال يجب أن يكون 10 أرقام تبدأ بـ 05.",
+      invalidDate: "التاريخ بصيغة DD/MM/YYYY.",
+      invalidYear: "أدخل سنة صحيحة من 4 أرقام.",
+      invalidChassis: "رقم الشاصي 17 حرفاً وأرقاماً.",
+    },
+  },
+} as const;
+
+export type TranslationKey = keyof typeof translations.en;
+
+export function t(
+  locale: Locale,
+  key: string,
+  vars?: Record<string, string | number>
+): string {
+  const parts = key.split(".");
+  let value: unknown = translations[locale];
+  for (const part of parts) {
+    if (value && typeof value === "object" && part in value) {
+      value = (value as Record<string, unknown>)[part];
+    } else {
+      return key;
+    }
+  }
+  let text = String(value);
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) {
+      text = text.replace(`{${k}}`, String(v));
+    }
+  }
+  return text;
+}
+
+export function getFieldLabel(locale: Locale, fieldName: string): string {
+  return t(locale, `fields.${fieldName}`);
+}
+
+export function getYesNoLabel(locale: Locale, value: "Yes" | "No"): string {
+  return value === "Yes" ? t(locale, "yes") : t(locale, "no");
+}

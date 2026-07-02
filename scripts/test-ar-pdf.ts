@@ -1,0 +1,56 @@
+import fs from "fs";
+import { generateQuotePdf } from "../src/lib/pdf-generator";
+
+const data = {
+  quotationNo: "MT-2026-1234567",
+  quoteIssueDate: "18-06-2026 15:06:55",
+  insuranceProduct: "MOTOR COMPREHENSIVE INSURANCE",
+  insurancePeriod: "13 Months",
+  broker: "DNI DIRECT SALES (CC)",
+  basicPremium: 6444,
+  additionalCovers: 0,
+  insuredName: "AMAL HUSSAIN",
+  mobileNo: "0561948285",
+  dateOfBirth: "03/01/1987",
+  emailId: "test@test.com",
+  ncdYears: "3+",
+  tcfNo: "3070361429",
+  nationality: "Yemen",
+  insuredType: "INDIVIDUAL",
+  regLocPlate: "Fujairah S 14015",
+  manufacturingYear: "2024",
+  make: "NISSAN",
+  trimBodyType: "SUV",
+  cylinders: "6",
+  chassisNo: "JN8BY2NY0R9452068",
+  seatingCapacity: "7+1",
+  gccSpecification: "Yes" as const,
+  vehicleValue: 179002,
+  repairType: "Agency",
+  lossOrDamage: "Yes" as const,
+  fireTheft: "Yes" as const,
+  thirdPartyBodily: "Yes" as const,
+  thirdPartyProperty: "Yes" as const,
+  pabDriver: "Yes" as const,
+  pabPassengers: "Yes" as const,
+  pabFamily: "Yes" as const,
+  geographicalArea: "Yes" as const,
+  stormFlood: "Yes" as const,
+  offRoad: "Yes" as const,
+  ambulance: "Yes" as const,
+  emergencyMedical: "Yes" as const,
+  windscreen: "Yes" as const,
+  personalEffects: "Yes" as const,
+  roadsideAssistance: "Yes" as const,
+  hireCarCovered: "No" as const,
+  hireCarPremium: 0,
+  agencyRepairCovered: "Yes" as const,
+  basicDeductible: "AED 500/-",
+  printedDate: "18-06-2026 15:12:14",
+  pdfLanguage: "ar" as const,
+};
+
+generateQuotePdf(data).then((pdf) => {
+  fs.writeFileSync("test-ar.pdf", pdf);
+  console.log("Arabic PDF OK", pdf.length);
+});
