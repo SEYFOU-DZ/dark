@@ -9,9 +9,10 @@ import {
 } from "@/lib/defaults";
 import { FORM_STEPS } from "@/lib/form-steps";
 import { validateStepFields } from "@/lib/field-config";
-import { FIELD_LABELS, STEP_META } from "@/lib/labels";
+import { FIELD_LABELS } from "@/lib/labels";
 import { formatCurrency } from "@/lib/format";
 import type { QuoteFormData } from "@/lib/types";
+import { useLocale } from "@/contexts/LocaleContext";
 import { FormFieldInput } from "./FormFieldInput";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
@@ -21,19 +22,26 @@ interface QuoteWizardProps {
   onClose: () => void;
 }
 
-const ALL_STEPS = [...STEP_META.map((s) => s.title), "Review"];
+const STEP_KEYS = ["quotation", "insured", "vehicle", "benefits", "covers"] as const;
 
 export function QuoteWizard({ onClose }: QuoteWizardProps) {
+  const { tr, locale, dir } = useLocale();
+
   const [step, setStep] = useState(0);
   const [data, setData] = useState<QuoteFormData>(createDefaultQuoteData);
   const [errors, setErrors] = useState<string[]>([]);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
 
+  const ALL_STEPS = [
+    ...STEP_KEYS.map((k) => tr(`steps.${k}.title`)),
+    tr("review"),
+  ];
+
   const totalSteps = FORM_STEPS.length + 1;
   const isReview = step === FORM_STEPS.length;
   const currentStep = FORM_STEPS[step];
-  const stepMeta = STEP_META[step];
+  const stepKey = STEP_KEYS[step];
   const progress = ((step + 1) / totalSteps) * 100;
 
   const premiums = useMemo(
@@ -99,14 +107,22 @@ export function QuoteWizard({ onClose }: QuoteWizardProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4 backdrop-blur-[1px]">
+    <div
+      dir={dir}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4 backdrop-blur-[1px]"
+    >
       <div className="flex max-h-[100dvh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl sm:max-h-[92vh]">
         <header className="border-b border-slate-100 bg-white px-4 py-5 sm:px-6">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">New Motor Quote</h2>
+              <h2 className="text-lg font-semibold text-slate-900">
+                {locale === "ar" ? "عرض سعر جديد" : "New Motor Quote"}
+              </h2>
               <p className="mt-0.5 text-xs text-slate-500">
-                Step {Math.min(step + 1, totalSteps)} of {totalSteps}
+                {tr("stepOf", {
+                  current: String(Math.min(step + 1, totalSteps)),
+                  total: String(totalSteps),
+                })}
               </p>
             </div>
             <Button
@@ -127,7 +143,7 @@ export function QuoteWizard({ onClose }: QuoteWizardProps) {
                 const done = index < step;
                 return (
                   <div
-                    key={title}
+                    key={index}
                     className={`rounded-md px-2 py-1.5 text-center text-[11px] font-medium leading-tight sm:text-xs transition-all ${
                       active
                         ? "bg-slate-900 text-white shadow-sm"
@@ -145,17 +161,21 @@ export function QuoteWizard({ onClose }: QuoteWizardProps) {
         </header>
 
         <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-          {!isReview && currentStep && stepMeta && (
+          {!isReview && currentStep && stepKey && (
             <div>
-              <h3 className="text-base font-semibold text-slate-900">{stepMeta.title}</h3>
-              <p className="mb-4 text-sm text-slate-500">{stepMeta.desc}</p>
+              <h3 className="text-base font-semibold text-slate-900">
+                {tr(`steps.${stepKey}.title`)}
+              </h3>
+              <p className="mb-4 text-sm text-slate-500">
+                {tr(`steps.${stepKey}.desc`)}
+              </p>
 
               {step === 0 && (
                 <Card className="mb-5 border-slate-200 bg-slate-50/50 shadow-none">
                   <CardContent className="grid gap-3 p-4 sm:grid-cols-3">
-                    <Stat label="Total" value={`${formatCurrency(premiums.subtotal)} AED`} />
-                    <Stat label="VAT (5%)" value={`${formatCurrency(premiums.vat)} AED`} />
-                    <Stat label="Total + VAT" value={`${formatCurrency(premiums.totalWithVat)} AED`} />
+                    <Stat label={tr("total")} value={`${formatCurrency(premiums.subtotal)} AED`} />
+                    <Stat label={tr("vat")} value={`${formatCurrency(premiums.vat)} AED`} />
+                    <Stat label={tr("totalVat")} value={`${formatCurrency(premiums.totalWithVat)} AED`} />
                   </CardContent>
                 </Card>
               )}
@@ -180,17 +200,15 @@ export function QuoteWizard({ onClose }: QuoteWizardProps) {
           {isReview && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-base font-semibold text-slate-900">Review & Download</h3>
-                <p className="text-sm text-slate-500">
-                  Verify your details, then download in English or Arabic.
-                </p>
+                <h3 className="text-base font-semibold text-slate-900">{tr("reviewTitle")}</h3>
+                <p className="text-sm text-slate-500">{tr("reviewDesc")}</p>
               </div>
 
-              <ReviewSection title="Quotation & Premium">
+              <ReviewSection title={tr("sections.quotation")}>
                 <ReviewItem label={FIELD_LABELS.quotationNo} value={review.quotationNo} />
                 <ReviewItem label={FIELD_LABELS.insuredName} value={review.insuredName} />
                 <ReviewItem label={FIELD_LABELS.make} value={review.make} />
-                <ReviewItem label="Total + VAT" value={`${review.totalWithVatFormatted} AED`} />
+                <ReviewItem label={tr("totalVat")} value={`${review.totalWithVatFormatted} AED`} />
               </ReviewSection>
 
               {downloadError && (
@@ -214,15 +232,15 @@ export function QuoteWizard({ onClose }: QuoteWizardProps) {
 
         <footer className="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <Button variant="secondary" onClick={step === 0 ? onClose : goBack}>
-            {step === 0 ? "Cancel" : "Back"}
+            {step === 0 ? tr("cancel") : tr("back")}
           </Button>
 
           {!isReview ? (
-            <Button onClick={goNext}>Next</Button>
+            <Button onClick={goNext}>{tr("next")}</Button>
           ) : (
             <Button onClick={downloadPdf} disabled={downloading}>
               <FileDown className="h-4 w-4" />
-              {downloading ? "Generating..." : "Download PDF"}
+              {downloading ? tr("generating") : tr("downloadEn")}
             </Button>
           )}
         </footer>
@@ -244,7 +262,9 @@ function ReviewSection({ title, children }: { title: string; children: ReactNode
   return (
     <Card className="border-slate-200/80 shadow-none">
       <CardContent className="p-4">
-        <h4 className="mb-3 text-sm font-semibold text-slate-900 border-b border-slate-100 pb-2">{title}</h4>
+        <h4 className="mb-3 text-sm font-semibold text-slate-900 border-b border-slate-100 pb-2">
+          {title}
+        </h4>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">{children}</dl>
       </CardContent>
     </Card>
@@ -255,7 +275,9 @@ function ReviewItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="text-slate-500 text-xs uppercase tracking-wider">{label}</dt>
-      <dd className="font-medium text-slate-800 mt-0.5">{value || "—"}</dd>
+      <dd className="font-medium text-slate-800 mt-0.5" dir="auto">
+        {value || "—"}
+      </dd>
     </div>
   );
 }

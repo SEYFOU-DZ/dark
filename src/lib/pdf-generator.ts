@@ -7,12 +7,22 @@ import {
   type PDFPage,
   type PDFFont,
 } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
+// @ts-ignore
+import reshaper from "arabic-persian-reshaper";
+import QRCode from "qrcode";
 import type { QuoteFormData } from "./types";
 import { calculatePremiums } from "./defaults";
 import { formatCurrency, formatDateTime, formatVehicleValue } from "./format";
 
 const FONT_SIZE = 8.3;
 const FONT_SIZE_SMALL = 7.7;
+
+// QR code position from the original template (both pages)
+// Derived from: q 52.500 0 0 52.500 512.109 772.892 cm /I1 Do Q
+const QR_X = 512;
+const QR_Y = 772;
+const QR_SIZE = 54; // points (≈ 52.5 rounded up slightly for clean cover)
 
 interface TextField {
   page: number;
@@ -96,23 +106,35 @@ function drawFieldText(
   page: PDFPage,
   field: TextField,
   text: string,
-  font: PDFFont
+  font: PDFFont,
+  amiriFont: PDFFont
 ) {
   const size = field.size ?? FONT_SIZE;
   const trimmed = text.trim();
   if (!trimmed) return;
 
+  const hasArabic = /[\u0600-\u06FF]/.test(trimmed);
+  let activeFont = font;
+  let finalLines = trimmed;
+
+  if (hasArabic) {
+    activeFont = amiriFont;
+    // Reshape and reverse Arabic text
+    const shaped = reshaper.ArabicShaper.convertArabic(trimmed);
+    finalLines = shaped.split("").reverse().join("");
+  }
+
   let x = field.x + 2;
   if (field.align === "right") {
-    const textWidth = font.widthOfTextAtSize(trimmed, size);
+    const textWidth = activeFont.widthOfTextAtSize(finalLines, size);
     x = field.x + field.width - textWidth;
   }
 
-  page.drawText(trimmed, {
+  page.drawText(finalLines, {
     x,
     y: field.y + 2,
     size,
-    font,
+    font: activeFont,
     color: rgb(0, 0, 0),
   });
 }
@@ -173,17 +195,84 @@ function buildValues(data: QuoteFormData) {
   };
 }
 
-export async function generateQuotePdf(data: QuoteFormData): Promise<Uint8Array> {
+/** Whiteout the original static QR code area on a given page */
+function whiteoutQr(page: PDFPage) {
+  page.drawRectangle({
+    x: QR_X - 2,
+    y: QR_Y - 2,
+    width: QR_SIZE + 4,
+    height: QR_SIZE + 4,
+    color: rgb(1, 1, 1),
+    borderWidth: 0,
+  });
+}
+
+/** Generate a QR code PNG buffer from a URL */
+async function generateQrPng(url: string): Promise<Buffer> {
+  return QRCode.toBuffer(url, {
+    type: "png",
+    width: 200,
+    margin: 1,
+    color: { dark: "#000000", light: "#ffffff" },
+    errorCorrectionLevel: "M",
+  });
+}
+
+/**
+ * Phase 1 — build PDF with all text fields filled and old QR blanked out.
+ * Returns raw bytes WITHOUT a final QR (needed before Cloudinary upload).
+ */
+export async function generateQuotePdfBytes(data: QuoteFormData): Promise<Uint8Array> {
   const templateBytes = fs.readFileSync(getTemplatePath());
   const pdf = await PDFDocument.load(templateBytes);
+  
+  // Register fontkit for custom font loading
+  pdf.registerFontkit(fontkit);
+
+  // Embed standard Helvetica and custom Amiri font
   const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const amiriFontBytes = fs.readFileSync(path.join(process.cwd(), "public", "fonts", "Amiri.ttf"));
+  const amiriFont = await pdf.embedFont(amiriFontBytes);
+
   const pages = pdf.getPages();
   const values = buildValues(data);
 
+  // Fill all dynamic text fields
   for (const [key, field] of Object.entries(DYNAMIC_FIELDS)) {
     const page = pages[field.page];
     drawWhiteOut(page, field);
-    drawFieldText(page, field, values[key as keyof typeof values] ?? "", font);
+    drawFieldText(page, field, values[key as keyof typeof values] ?? "", font, amiriFont);
+  }
+
+  // Blank out the original static QR code on every page
+  for (const page of pages) {
+    whiteoutQr(page);
+  }
+
+  return pdf.save();
+}
+
+/**
+ * Phase 2 — embed a unique QR code (linked to cloudinaryUrl) on every page.
+ * Returns the final PDF bytes ready for browser download.
+ */
+export async function embedQrCodeInPdf(
+  pdfBytes: Uint8Array,
+  cloudinaryUrl: string
+): Promise<Uint8Array> {
+  const pdf = await PDFDocument.load(pdfBytes);
+  const pages = pdf.getPages();
+
+  const qrPng = await generateQrPng(cloudinaryUrl);
+  const qrImage = await pdf.embedPng(qrPng);
+
+  for (const page of pages) {
+    page.drawImage(qrImage, {
+      x: QR_X,
+      y: QR_Y,
+      width: QR_SIZE,
+      height: QR_SIZE,
+    });
   }
 
   return pdf.save();
@@ -198,6 +287,11 @@ export async function prepareBlankTemplate(): Promise<void> {
 
   for (const field of Object.values(DYNAMIC_FIELDS)) {
     drawWhiteOut(pages[field.page], field);
+  }
+
+  // Also blank QR areas in the pre-processed template
+  for (const page of pages) {
+    whiteoutQr(page);
   }
 
   fs.writeFileSync(outputPath, await pdf.save());

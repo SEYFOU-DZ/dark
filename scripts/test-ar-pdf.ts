@@ -1,5 +1,5 @@
 import fs from "fs";
-import { generateQuotePdf } from "../src/lib/pdf-generator";
+import { generateQuotePdfBytes } from "../src/lib/pdf-generator";
 
 const data = {
   quotationNo: "MT-2026-1234567",
@@ -47,10 +47,9 @@ const data = {
   agencyRepairCovered: "Yes" as const,
   basicDeductible: "AED 500/-",
   printedDate: "18-06-2026 15:12:14",
-  pdfLanguage: "ar" as const,
 };
 
-generateQuotePdf(data).then((pdf) => {
+generateQuotePdfBytes(data).then((pdf: Uint8Array) => {
   fs.writeFileSync("test-ar.pdf", pdf);
-  console.log("Arabic PDF OK", pdf.length);
+  console.log("PDF OK", pdf.length);
 });
