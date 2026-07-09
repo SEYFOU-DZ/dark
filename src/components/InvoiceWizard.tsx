@@ -105,6 +105,8 @@ export function InvoiceWizard({ onClose, onSuccess }: InvoiceWizardProps) {
           feeDescription: data.feeDescription,
           feeAmount: data.feeAmount,
           feeNotes: data.feeNotes,
+          notes1: data.notes1,
+          notes2: data.notes2,
           subtotal: data.feeAmount,
           total: data.feeAmount,
           items: [

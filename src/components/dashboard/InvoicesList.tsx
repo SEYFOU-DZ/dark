@@ -6,8 +6,17 @@ import { apiJson } from '@/lib/api';
 
 interface Invoice {
   _id: string;
+  invoiceNo: string;
   customerName: string;
   customerPhone: string;
+  vehicleType: string;
+  vehicleCategory: string;
+  trafficCode: string;
+  feeDescription: string;
+  feeAmount: number;
+  feeNotes: string;
+  notes1: string;
+  notes2: string;
   total: number;
   pdfUrl: string;
   createdAt: string;

@@ -35,18 +35,19 @@ export async function GET(
     const invoiceData = await invoiceRes.json();
 
     // Regenerate PDF from stored invoice data
+    // Use all stored fields directly - no fallbacks to avoid mixing old/new data
     const pdfBytes = await generateInvoicePdfBytes({
-      invoiceNo: invoiceData.invoiceNo,
-      invoiceDate: invoiceData.invoiceDate,
-      customerName: invoiceData.customerName,
+      invoiceNo: invoiceData.invoiceNo || "",
+      invoiceDate: invoiceData.invoiceDate || "",
+      customerName: invoiceData.customerName || "",
       vehicleType: invoiceData.vehicleType || "",
       vehicleCategory: invoiceData.vehicleCategory || "",
       trafficCode: invoiceData.trafficCode || "",
       feeDescription: invoiceData.feeDescription || "",
-      feeAmount: invoiceData.feeAmount,
+      feeAmount: invoiceData.feeAmount || 0,
       feeNotes: invoiceData.feeNotes || "",
-      notes1: invoiceData.notes || "",
-      notes2: "",
+      notes1: invoiceData.notes1 || "",
+      notes2: invoiceData.notes2 || "",
     });
 
     return new NextResponse(Buffer.from(pdfBytes), {
