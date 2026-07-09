@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm run prepare-template && next build",
+    "build": "npm run prepare-template && npm run prepare-invoice-template && next build",
     "start": "next start",
     "lint": "eslint",
-    "prepare-template": "tsx scripts/prepare-template.ts"
+    "prepare-template": "tsx scripts/prepare-template.ts",
+    "prepare-invoice-template": "tsx scripts/build-invoice-template.ts",
+    "build-invoice-template": "tsx scripts/build-invoice-template.ts"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",
@@ -15,11 +17,13 @@
     "@radix-ui/react-progress": "^1.1.11",
     "@radix-ui/react-select": "^2.3.2",
     "@radix-ui/react-slot": "^1.3.0",
+    "@types/js-cookie": "^3.0.6",
     "arabic-persian-reshaper": "^1.0.1",
     "canvas": "^3.2.3",
     "class-variance-authority": "^0.7.1",
     "cloudinary": "^2.10.0",
     "clsx": "^2.1.1",
+    "js-cookie": "^3.0.8",
     "lucide-react": "^1.23.0",
     "next": "16.2.10",
     "pdf-lib": "^1.17.1",

@@ -20,15 +20,13 @@ export async function POST(request: NextRequest) {
     const rawPdfBytes = await generateQuotePdfBytes(body);
 
     // Phase 2: Upload raw PDF to Cloudinary — get the storage URL
-    await uploadPdfToCloudinary(rawPdfBytes, filename);
+    const storageUrl = await uploadPdfToCloudinary(rawPdfBytes, filename);
 
     // Phase 3: Build the QR URL — points to our internal viewer route
     // so scanning with a phone opens a real web page (which redirects to Cloudinary).
     // Use NEXT_PUBLIC_APP_URL in production (e.g. https://your-domain.com).
     // Falls back to localhost for local development.
-    const appUrl =
-      process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ??
-      `http://localhost:${process.env.PORT ?? 3000}`;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? `http://localhost:${process.env.PORT ?? 3000}`;
     const qrUrl = `${appUrl}/api/view/${encodeURIComponent(filename)}`;
 
     // Phase 4: Embed QR code that links to the viewer route
@@ -39,6 +37,7 @@ export async function POST(request: NextRequest) {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${filename}.pdf"`,
+        "X-Pdf-Url": storageUrl,
       },
     });
   } catch (error) {

@@ -27,22 +27,22 @@ export async function GET(
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Motor Quote — ${id}</title>
+  <title>DNI Document — ${id}</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0f172a;
-      color: #f1f5f9;
+      background: #f8fafc;
+      color: #0f172a;
       min-height: 100dvh;
       display: flex;
       flex-direction: column;
     }
 
     header {
-      background: #1e293b;
-      border-bottom: 1px solid #334155;
+      background: #ffffff;
+      border-bottom: 1px solid #e2e8f0;
       padding: 14px 20px;
       display: flex;
       align-items: center;
@@ -55,9 +55,8 @@ export async function GET(
       font-size: 15px;
       font-weight: 700;
       letter-spacing: -0.3px;
-      color: #f1f5f9;
+      color: #0f172a;
     }
-    .logo span { color: #38bdf8; }
 
     .quote-id {
       font-size: 12px;
@@ -128,7 +127,7 @@ export async function GET(
 </head>
 <body>
   <header>
-    <div class="logo">Motor<span>Quote</span></div>
+    <div class="logo">DNI</div>
     <div class="quote-id">${id}</div>
     <a class="download-btn" href="${downloadUrl}" download="${id}.pdf">
       &#8681; Download PDF
@@ -139,7 +138,7 @@ export async function GET(
     <iframe
       id="viewer"
       src="${pdfUrl}"
-      title="Motor Quote ${id}"
+      title="DNI Document ${id}"
     ></iframe>
 
     <div class="fallback" id="fallback">

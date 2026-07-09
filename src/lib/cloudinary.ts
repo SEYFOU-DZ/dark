@@ -12,13 +12,14 @@ cloudinary.config({
  */
 export async function uploadPdfToCloudinary(
   pdfBytes: Uint8Array,
-  publicId: string
+  publicId: string,
+  folder = "motor-quotes"
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         resource_type: "raw",
-        folder: "motor-quotes",
+        folder,
         public_id: publicId,
         overwrite: true,
         format: "txt", // Upload as .txt to bypass Cloudinary's PDF download block

@@ -3,8 +3,8 @@ import "./globals.css";
 import { LocaleProvider } from "@/contexts/LocaleContext";
 
 export const metadata: Metadata = {
-  title: "Motor Quote Dashboard",
-  description: "Create and download motor insurance quotation PDFs",
+  title: "Dashboard",
+  description: "Request and invoice dashboard",
 };
 
 export default function RootLayout({

@@ -3,64 +3,57 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { FileDown, X } from "lucide-react";
 import {
-  createDefaultQuoteData,
-  calculatePremiums,
-  summarizeForReview,
-} from "@/lib/defaults";
-import { FORM_STEPS } from "@/lib/form-steps";
-import { validateStepFields } from "@/lib/field-config";
-import { FIELD_LABELS } from "@/lib/labels";
-import { formatCurrency } from "@/lib/format";
-import type { QuoteFormData } from "@/lib/types";
+  createDefaultInvoiceData,
+  formatFeeAmount,
+  summarizeInvoice,
+} from "@/lib/invoice/defaults";
 import { apiJson } from "@/lib/api";
+import { INVOICE_FORM_STEPS } from "@/lib/invoice/form-steps";
+import { validateInvoiceStepFields } from "@/lib/invoice/field-config";
+import type { InvoiceFormData } from "@/lib/invoice/types";
 import { useLocale } from "@/contexts/LocaleContext";
-import { FormFieldInput } from "./FormFieldInput";
+import { InvoiceFormFieldInput } from "./InvoiceFormFieldInput";
 import { Button } from "./ui/button";
 import { Card, CardContent } from "./ui/card";
 import { Progress } from "./ui/progress";
 
-interface QuoteWizardProps {
+interface InvoiceWizardProps {
   onClose: () => void;
   onSuccess?: () => void | Promise<void>;
 }
 
-const STEP_KEYS = ["quotation", "insured", "vehicle", "benefits", "covers"] as const;
+const STEP_KEYS = ["customer", "fees"] as const;
 
-export function QuoteWizard({ onClose, onSuccess }: QuoteWizardProps) {
-  const { tr, locale, dir } = useLocale();
+export function InvoiceWizard({ onClose, onSuccess }: InvoiceWizardProps) {
+  const { tr, dir } = useLocale();
 
   const [step, setStep] = useState(0);
-  const [data, setData] = useState<QuoteFormData>(createDefaultQuoteData);
+  const [data, setData] = useState<InvoiceFormData>(createDefaultInvoiceData);
   const [errors, setErrors] = useState<string[]>([]);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
 
   const ALL_STEPS = [
-    ...STEP_KEYS.map((k) => tr(`steps.${k}.title`)),
+    ...STEP_KEYS.map((k) => tr(`invoiceSteps.${k}.title`)),
     tr("review"),
   ];
 
-  const totalSteps = FORM_STEPS.length + 1;
-  const isReview = step === FORM_STEPS.length;
-  const currentStep = FORM_STEPS[step];
+  const totalSteps = INVOICE_FORM_STEPS.length + 1;
+  const isReview = step === INVOICE_FORM_STEPS.length;
+  const currentStep = INVOICE_FORM_STEPS[step];
   const stepKey = STEP_KEYS[step];
   const progress = ((step + 1) / totalSteps) * 100;
 
-  const premiums = useMemo(
-    () => calculatePremiums(data.basicPremium, data.additionalCovers),
-    [data.basicPremium, data.additionalCovers]
-  );
+  const review = useMemo(() => summarizeInvoice(data), [data]);
 
-  const review = useMemo(() => summarizeForReview(data), [data]);
-
-  function updateField(name: keyof QuoteFormData, value: string | number) {
+  function updateField(name: keyof InvoiceFormData, value: string | number) {
     setData((prev) => ({ ...prev, [name]: value }));
     setErrors([]);
   }
 
   function goNext() {
     if (!currentStep) return;
-    const stepErrors = validateStepFields(currentStep.fields, data);
+    const stepErrors = validateInvoiceStepFields(currentStep.fields, data);
     if (stepErrors.length > 0) {
       setErrors(stepErrors);
       return;
@@ -78,43 +71,50 @@ export function QuoteWizard({ onClose, onSuccess }: QuoteWizardProps) {
     setDownloading(true);
     setDownloadError("");
     try {
-      const pdfResponse = await fetch("/api/generate-pdf", {
+      const response = await fetch("/api/generate-invoice-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          printedDate: data.printedDate || data.quoteIssueDate,
-        }),
+        body: JSON.stringify(data),
       });
 
-      if (!pdfResponse.ok) {
-        const err = await pdfResponse.json().catch(() => ({}));
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
         throw new Error(err.error || "Could not generate PDF. Please try again.");
       }
 
-      const pdfUrl = pdfResponse.headers.get("x-pdf-url") || undefined;
-      const blob = await pdfResponse.blob();
+      const pdfUrl = response.headers.get("x-pdf-url") || undefined;
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${data.quotationNo}.pdf`;
+      link.download = `${data.invoiceNo}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
 
-      const vehicleYear = Number.parseInt(data.manufacturingYear, 10);
-
-      await apiJson('/api/requests', {
-        method: 'POST',
+      await apiJson("/api/invoices", {
+        method: "POST",
         body: JSON.stringify({
-          customerName: data.insuredName,
-          customerPhone: data.mobileNo,
-          vehicleMake: data.make,
-          vehicleModel: data.trimBodyType,
-          vehicleYear: Number.isFinite(vehicleYear) ? vehicleYear : new Date().getFullYear(),
-          vehiclePlate: data.regLocPlate,
-          description: `Motor insurance quote ${data.quotationNo}`,
+          invoiceNo: data.invoiceNo,
+          invoiceDate: data.invoiceDate,
+          customerName: data.customerName,
+          vehicleType: data.vehicleType,
+          vehicleCategory: data.vehicleCategory,
+          trafficCode: data.trafficCode,
+          feeDescription: data.feeDescription,
+          feeAmount: data.feeAmount,
+          feeNotes: data.feeNotes,
+          subtotal: data.feeAmount,
+          total: data.feeAmount,
+          items: [
+            {
+              description: data.feeDescription,
+              quantity: 1,
+              price: data.feeAmount,
+              total: data.feeAmount,
+            },
+          ],
           pdfUrl,
         }),
       });
@@ -141,7 +141,7 @@ export function QuoteWizard({ onClose, onSuccess }: QuoteWizardProps) {
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-slate-900">
-                {tr('newQuoteTitle')}
+                {tr("newInvoice")}
               </h2>
               <p className="mt-0.5 text-xs text-slate-500">
                 {tr("stepOf", {
@@ -162,7 +162,7 @@ export function QuoteWizard({ onClose, onSuccess }: QuoteWizardProps) {
 
           <div className="mt-4 rounded-lg bg-slate-50 border border-slate-100/80 p-3">
             <Progress value={progress} />
-            <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {ALL_STEPS.map((title, index) => {
                 const active = index === step;
                 const done = index < step;
@@ -189,29 +189,30 @@ export function QuoteWizard({ onClose, onSuccess }: QuoteWizardProps) {
           {!isReview && currentStep && stepKey && (
             <div>
               <h3 className="text-base font-semibold text-slate-900">
-                {tr(`steps.${stepKey}.title`)}
+                {tr(`invoiceSteps.${stepKey}.title`)}
               </h3>
               <p className="mb-4 text-sm text-slate-500">
-                {tr(`steps.${stepKey}.desc`)}
+                {tr(`invoiceSteps.${stepKey}.desc`)}
               </p>
 
-              {step === 0 && (
+              {step === 1 && (
                 <Card className="mb-5 border-slate-200 bg-slate-50/50 shadow-none">
-                  <CardContent className="grid gap-3 p-4 sm:grid-cols-3">
-                    <Stat label={tr("total")} value={`${formatCurrency(premiums.subtotal)} AED`} />
-                    <Stat label={tr("vat")} value={`${formatCurrency(premiums.vat)} AED`} />
-                    <Stat label={tr("totalVat")} value={`${formatCurrency(premiums.totalWithVat)} AED`} />
+                  <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
+                    <Stat
+                      label={tr("invoiceFields.feeAmount")}
+                      value={`${formatFeeAmount(data.feeAmount)} AED`}
+                    />
+                    <Stat
+                      label={tr("invoiceTotalDue")}
+                      value={review.totalFormatted}
+                    />
                   </CardContent>
                 </Card>
               )}
 
-              <div
-                className={`grid gap-4 ${
-                  currentStep.id === "benefits" ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"
-                }`}
-              >
+              <div className="grid gap-4 sm:grid-cols-2">
                 {currentStep.fields.map((fieldName) => (
-                  <FormFieldInput
+                  <InvoiceFormFieldInput
                     key={fieldName}
                     name={fieldName}
                     value={data[fieldName]}
@@ -225,15 +226,28 @@ export function QuoteWizard({ onClose, onSuccess }: QuoteWizardProps) {
           {isReview && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-base font-semibold text-slate-900">{tr("reviewTitle")}</h3>
-                <p className="text-sm text-slate-500">{tr("reviewDesc")}</p>
+                <h3 className="text-base font-semibold text-slate-900">
+                  {tr("reviewTitle")}
+                </h3>
+                <p className="text-sm text-slate-500">{tr("invoiceReviewDesc")}</p>
               </div>
 
-              <ReviewSection title={tr("sections.quotation")}>
-                <ReviewItem label={FIELD_LABELS.quotationNo} value={review.quotationNo} />
-                <ReviewItem label={FIELD_LABELS.insuredName} value={review.insuredName} />
-                <ReviewItem label={FIELD_LABELS.make} value={review.make} />
-                <ReviewItem label={tr("totalVat")} value={`${review.totalWithVatFormatted} AED`} />
+              <ReviewSection title={tr("invoiceSections.header")}>
+                <ReviewItem label={tr("invoiceFields.invoiceNo")} value={review.invoiceNo} />
+                <ReviewItem label={tr("invoiceFields.invoiceDate")} value={review.invoiceDate} />
+              </ReviewSection>
+
+              <ReviewSection title={tr("invoiceSections.customer")}>
+                <ReviewItem label={tr("invoiceFields.customerName")} value={review.customerName} />
+                <ReviewItem label={tr("invoiceFields.vehicleType")} value={review.vehicleType} />
+                <ReviewItem label={tr("invoiceFields.vehicleCategory")} value={review.vehicleCategory} />
+                <ReviewItem label={tr("invoiceFields.trafficCode")} value={review.trafficCode} />
+              </ReviewSection>
+
+              <ReviewSection title={tr("invoiceSections.fees")}>
+                <ReviewItem label={tr("invoiceFields.feeDescription")} value={review.feeDescription} />
+                <ReviewItem label={tr("invoiceFields.feeAmount")} value={`${review.feeAmountFormatted} AED`} />
+                <ReviewItem label={tr("invoiceTotalDue")} value={review.totalFormatted} />
               </ReviewSection>
 
               {downloadError && (
@@ -265,7 +279,7 @@ export function QuoteWizard({ onClose, onSuccess }: QuoteWizardProps) {
           ) : (
             <Button onClick={downloadPdf} disabled={downloading}>
               <FileDown className="h-4 w-4" />
-              {downloading ? tr("generating") : tr("downloadEn")}
+              {downloading ? tr("generating") : tr("downloadInvoice")}
             </Button>
           )}
         </footer>
