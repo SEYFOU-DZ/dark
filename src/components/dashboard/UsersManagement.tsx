@@ -105,12 +105,14 @@ export default function UsersManagement({ locale }: { locale: string }) {
       
       await apiJson(`/api/admin/users/${userId}`, {
         method: 'PUT',
-        body: JSON.stringify({ ...user, isAdmin: !currentStatus }),
+        body: JSON.stringify({ name: user.name, email: user.email, isAdmin: !currentStatus }),
       });
 
       await fetchUsers();
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -174,10 +176,12 @@ export default function UsersManagement({ locale }: { locale: string }) {
                 <input
                   type="password"
                   required
+                  minLength={6}
                   value={newUser.password}
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:border-slate-400"
                 />
+                <p className="mt-1 text-xs text-slate-500">Password must be at least 6 characters</p>
               </div>
               <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <input
