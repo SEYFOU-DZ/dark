@@ -114,6 +114,7 @@ export function QuoteWizard({ onClose, onSuccess }: QuoteWizardProps) {
           vehicleModel: data.trimBodyType,
           vehicleYear: Number.isFinite(vehicleYear) ? vehicleYear : new Date().getFullYear(),
           vehiclePlate: data.regLocPlate,
+          quotationNo: data.quotationNo,
           description: `Motor insurance quote ${data.quotationNo}`,
           pdfUrl,
         }),

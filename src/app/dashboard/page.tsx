@@ -26,6 +26,7 @@ interface Request {
   decisionDate?: string | null;
   messageSeenAt?: string | null;
   createdAt: string;
+  pdfUrl?: string;
   userId?: {
     _id: string;
     name: string;
@@ -683,22 +684,29 @@ export default function DashboardPage() {
                                       <span className="text-sm text-slate-500">{t('processed')}</span>
                                     )}
                                     <div className="flex gap-1.5 mt-1">
-                                      <a
-                                        href={`/api/requests/pdf/${request._id}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 rounded-md bg-blue-100 px-2 py-1 text-blue-700 transition-colors hover:bg-blue-200"
-                                      >
-                                        <Eye size={13} />
-                                        <span className="hidden sm:inline">{t('view')}</span>
-                                      </a>
-                                      <a
-                                        href={`/api/requests/pdf/${request._id}?download=true`}
-                                        className="inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-1 text-green-700 transition-colors hover:bg-green-200"
-                                      >
-                                        <Download size={13} />
-                                        <span className="hidden sm:inline">{t('download')}</span>
-                                      </a>
+                                      {request.pdfUrl ? (
+                                        <>
+                                          <a
+                                            href={`/api/requests/pdf/${request._id}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 rounded-md bg-blue-100 px-2 py-1 text-blue-700 transition-colors hover:bg-blue-200"
+                                          >
+                                            <Eye size={13} />
+                                            <span className="hidden sm:inline">{t('view')}</span>
+                                          </a>
+                                          <a
+                                            href={`/api/requests/pdf/${request._id}?download=true`}
+                                            download
+                                            className="inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-1 text-green-700 transition-colors hover:bg-green-200"
+                                          >
+                                            <Download size={13} />
+                                            <span className="hidden sm:inline">{t('download')}</span>
+                                          </a>
+                                        </>
+                                      ) : (
+                                        <span className="text-sm text-slate-500">{t('noFile')}</span>
+                                      )}
                                     </div>
                                     </td>
                                   )}
