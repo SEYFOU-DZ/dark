@@ -2,14 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+    
+    // Read token from cookies to forward to backend
+    const token = request.cookies.get("token")?.value;
+    
     const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    const response = await fetch(`${backendUrl}/api/custom-invoices/${params.id}`, {
+    const response = await fetch(`${backendUrl}/api/custom-invoices/${id}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       },
     });
 
