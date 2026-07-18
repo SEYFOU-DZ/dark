@@ -9,7 +9,8 @@ import {
   LogOut,
   Menu,
   X,
-  Languages
+  Languages,
+  Sparkles
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { getUser, logout } from '@/lib/auth';
@@ -38,6 +39,7 @@ export default function Sidebar({ activeTab, onTabChange, locale, onLocaleChange
       requests: { en: 'Requests', ar: 'الطلبات' },
       invoices: { en: 'Invoices', ar: 'الفواتير' },
       users: { en: 'Users', ar: 'المستخدمين' },
+      'custom-invoices': { en: 'Custom Invoices', ar: 'الفواتير المخصصة' },
       logout: { en: 'Logout', ar: 'تسجيل الخروج' },
       admin: { en: 'Admin', ar: 'مشرف' },
       user: { en: 'User', ar: 'مستخدم' },
@@ -53,6 +55,7 @@ export default function Sidebar({ activeTab, onTabChange, locale, onLocaleChange
 
   if (isAdmin) {
     menuItems.push({ id: 'users', icon: Users });
+    menuItems.push({ id: 'custom-invoices', icon: Sparkles });
   }
 
   return (

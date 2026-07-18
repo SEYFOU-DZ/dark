@@ -8,6 +8,8 @@ import { LayoutDashboard, FileText, Receipt, Users, LogOut, Languages, Plus, Clo
 import { QuoteWizard } from '@/components/QuoteWizard';
 import { InvoiceWizard } from '@/components/InvoiceWizard';
 import UsersManagement from '@/components/dashboard/UsersManagement';
+import CustomInvoiceForm from '@/components/admin/CustomInvoiceForm';
+import CustomInvoicesList from '@/components/admin/CustomInvoicesList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -65,6 +67,8 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showRequestWizard, setShowRequestWizard] = useState(false);
   const [showInvoiceWizard, setShowInvoiceWizard] = useState(false);
+  const [showCustomInvoiceForm, setShowCustomInvoiceForm] = useState(false);
+  const [customInvoicesRefresh, setCustomInvoicesRefresh] = useState(0);
   const [requests, setRequests] = useState<Request[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -274,6 +278,8 @@ export default function DashboardPage() {
       createUserSuccess: { en: 'User created successfully', ar: 'تم إنشاء المستخدم بنجاح' },
       createUserError: { en: 'Could not create user', ar: 'تعذر إنشاء المستخدم' },
       userCreated: { en: 'User added', ar: 'تمت إضافة المستخدم' },
+      customInvoices: { en: 'Custom Invoices', ar: 'الفواتير المخصصة' },
+      createCustomInvoice: { en: 'Create Custom Invoice', ar: 'إنشاء فاتورة مخصصة' },
     };
     return translations[key]?.[locale] || key;
   };
@@ -301,6 +307,7 @@ export default function DashboardPage() {
 
   if (isAdmin) {
     menuItems.push({ id: 'users', icon: Users });
+    menuItems.push({ id: 'custom-invoices', icon: Sparkles });
   }
 
   const handleLogout = () => {
@@ -832,6 +839,21 @@ export default function DashboardPage() {
             {activeTab === 'users' && isAdmin && (
               <UsersManagement locale={locale} />
             )}
+
+            {activeTab === 'custom-invoices' && isAdmin && (
+              <>
+                <div className="mb-6">
+                  <Button onClick={() => setShowCustomInvoiceForm(true)}>
+                    <Plus className="h-4 w-4 ml-2" />
+                    {t('createCustomInvoice')}
+                  </Button>
+                </div>
+                <CustomInvoicesList 
+                  locale={locale} 
+                  onRefresh={() => setCustomInvoicesRefresh(prev => prev + 1)}
+                />
+              </>
+            )}
           </main>
         </div>
       </div>
@@ -846,6 +868,16 @@ export default function DashboardPage() {
         <InvoiceWizard
           onClose={() => setShowInvoiceWizard(false)}
           onSuccess={loadDashboardData}
+        />
+      )}
+      {showCustomInvoiceForm && (
+        <CustomInvoiceForm
+          locale={locale}
+          isOpen={showCustomInvoiceForm}
+          onClose={() => setShowCustomInvoiceForm(false)}
+          onSuccess={() => {
+            setCustomInvoicesRefresh(prev => prev + 1);
+          }}
         />
       )}
 
