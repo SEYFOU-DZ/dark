@@ -27,7 +27,7 @@ function shapeAr(text: string): string {
   if (!text || !hasAr(text)) return text;
   try {
     const shaped = reshaper.ArabicShaper.convertArabic(text.trim());
-    const parts  = shaped.match(/([\u0600-\u06FF\u200C\u200D\s]+)|([^\u0600-\u06FF]+)/g);
+    const parts  = shaped.match(/([\u0600-\u06FF\u200C\u200D]+)|([^\u0600-\u06FF]+)/g);
     if (!parts) return shaped.split("").reverse().join("");
     return parts
       .map((p: string) => hasAr(p) ? p.split("").reverse().join("") : p)
@@ -46,22 +46,39 @@ type Opts = {
   arabic?: boolean;
 };
 
-/** Base draw: caller supplies the exact font.
- *  fakeBold=true draws the glyph twice at +0.45px offset to simulate bold weight. */
-function baseDraw(page: PDFPage) {
-  return (text: string, x: number, y: number, font: Fnt, opts: Opts = {}, fakeBold = false) => {
-    const { size = 9, color = DARK, align = "left", arabic = false } = opts;
-    const isAr = arabic || hasAr(text);
-    const str  = isAr ? shapeAr(text) : text;
-    if (!str) return;
-    const w = font.widthOfTextAtSize(str, size);
-    let dx = x;
-    if (align === "right")  dx = x - w;
-    if (align === "center") dx = x - w / 2;
-    page.drawText(str, { x: dx, y, size, font, color });
-    if (fakeBold) {
-      page.drawText(str, { x: dx + 0.45, y, size, font, color });
-    }
+/** Base draw: splits mixed text to render Arabic parts with arRegF and English parts with latFont.
+ *  This prevents blank squares when fonts lack glyphs for the other language. */
+function baseDraw(page: PDFPage, regF: Fnt, medF: Fnt, heavyF: Fnt, arRegF: Fnt) {
+  return (text: string, x: number, y: number, opts: Opts = {}, weight: "regular" | "medium" | "heavy" = "regular") => {
+    const { size = 9, color = DARK, align = "left" } = opts;
+    if (!text) return;
+
+    // Split text by slashes or pipes to handle bilingual blocks independently
+    const segments = text.split(/([\/|])/);
+    const latFont = weight === "heavy" ? heavyF : (weight === "medium" ? medF : regF);
+
+    const prepared = segments.map(seg => {
+      const isAr = hasAr(seg);
+      const font = isAr ? arRegF : latFont;
+      const str  = isAr ? shapeAr(seg) : seg;
+      const w    = font.widthOfTextAtSize(str, size);
+      return { str, font, isAr, w };
+    });
+
+    const totalW = prepared.reduce((sum, item) => sum + item.w, 0);
+
+    let startX = x;
+    if (align === "right")  startX = x - totalW;
+    if (align === "center") startX = x - totalW / 2;
+
+    prepared.forEach(item => {
+      const useFakeBold = item.isAr && (weight === "medium" || weight === "heavy");
+      page.drawText(item.str, { x: startX, y, size, font: item.font, color });
+      if (useFakeBold) {
+        page.drawText(item.str, { x: startX + 0.45, y, size, font: item.font, color });
+      }
+      startX += item.w;
+    });
   };
 }
 
@@ -99,25 +116,21 @@ export async function generateCustomInvoicePdf(data: CustomInvoiceFormData): Pro
 
   // ── Convenience draw helpers ──
   const page = pdf.addPage([PAGE_W, PAGE_H]);
-  const raw  = baseDraw(page);
+  const draw = baseDraw(page, regF, medF, heavyF, arRegF);
 
   /** Regular weight (body text) */
   const dt = (text: string, x: number, y: number, opts: Opts = {}) => {
-    const isAr = opts.arabic || hasAr(text);
-    raw(text, x, y, isAr ? arRegF : regF, opts, false);
+    draw(text, x, y, opts, "regular");
   };
 
-  /** Medium-bold weight (labels, table headers, totals, "ملاحظات").
-   *  Arabic: uses fake-bold double-draw since no bold Arabic font is available in public/fonts. */
+  /** Medium-bold weight (labels, table headers, totals, "ملاحظات"). */
   const dtM = (text: string, x: number, y: number, opts: Opts = {}) => {
-    const isAr = opts.arabic || hasAr(text);
-    raw(text, x, y, isAr ? arRegF : medF, opts, isAr);
+    draw(text, x, y, opts, "medium");
   };
 
   /** Heavy weight (company name in header only). */
   const dtH = (text: string, x: number, y: number, opts: Opts = {}) => {
-    const isAr = opts.arabic || hasAr(text);
-    raw(text, x, y, isAr ? arRegF : heavyF, opts, isAr);
+    draw(text, x, y, opts, "heavy");
   };
 
   // ─── Snapshot ───
@@ -152,19 +165,71 @@ export async function generateCustomInvoicePdf(data: CustomInvoiceFormData): Pro
   let logoBottom  = PAGE_H - MT - logoAreaH;
   if (logoSrc) {
     try {
-      const buf = logoSrc.startsWith("data:image")
-        ? Buffer.from(logoSrc.split(",")[1], "base64")
-        : fs.readFileSync(logoSrc);
-      const img = (logoSrc.includes("image/png") || logoSrc.endsWith(".png"))
-        ? await pdf.embedPng(buf) : await pdf.embedJpg(buf);
+      console.log("Processing logo, source type:", logoSrc.startsWith("data:image") ? "data URI" : logoSrc.startsWith("http") ? "URL" : "file path");
+      
+      // Step 1: Load the raw bytes (data URI, remote URL, or local file path)
+      let buf: Buffer;
+      if (logoSrc.startsWith("data:image")) {
+        const base64Data = logoSrc.split(",")[1];
+        if (!base64Data) throw new Error("Invalid data URI: no base64 data found");
+        buf = Buffer.from(base64Data, "base64");
+        console.log("Loaded data URI, buffer size:", buf.length);
+      } else if (logoSrc.startsWith("http://") || logoSrc.startsWith("https://")) {
+        const res = await fetch(logoSrc);
+        if (!res.ok) throw new Error(`Logo fetch failed: ${res.status}`);
+        buf = Buffer.from(await res.arrayBuffer());
+        console.log("Fetched from URL, buffer size:", buf.length);
+      } else {
+        buf = fs.readFileSync(logoSrc);
+        console.log("Read from file, buffer size:", buf.length);
+      }
+
+      // Step 2: Try direct embedding first (for PNG, JPG)
+      let img: any;
+      let directEmbedSuccess = false;
+      
+      if (logoSrc.includes("image/png")) {
+        try {
+          img = await pdf.embedPng(buf);
+          directEmbedSuccess = true;
+          console.log("Direct PNG embed successful");
+        } catch (e) {
+          console.log("Direct PNG embed failed, trying sharp conversion:", e);
+        }
+      } else if (logoSrc.includes("image/jpeg") || logoSrc.includes("image/jpg")) {
+        try {
+          img = await pdf.embedJpg(buf);
+          directEmbedSuccess = true;
+          console.log("Direct JPG embed successful");
+        } catch (e) {
+          console.log("Direct JPG embed failed, trying sharp conversion:", e);
+        }
+      }
+
+      // Step 3: If direct embed failed, use sharp conversion (for WebP, GIF, SVG, etc.)
+      if (!directEmbedSuccess) {
+        console.log("Converting image using sharp...");
+        const sharp = (await import("sharp")).default;
+        const pngBuf = await sharp(buf).png().toBuffer();
+        console.log("Converted to PNG using sharp, buffer size:", pngBuf.length);
+        
+        img = await pdf.embedPng(pngBuf);
+      }
+
+      // Step 4: Draw the image
       let sc = logoAreaW / img.width;
       if (img.height * sc > logoAreaH) sc = logoAreaH / img.height;
-      const lw = img.width*sc, lh = img.height*sc;
-      const lx = PAGE_W/2 - lw/2;
-      const ly = (PAGE_H - MT - logoAreaH) + (logoAreaH/2 - lh/2);
-      page.drawImage(img, { x:lx, y:ly, width:lw, height:lh });
+      const lw = img.width * sc, lh = img.height * sc;
+      const lx = PAGE_W / 2 - lw / 2;
+      const ly = (PAGE_H - MT - logoAreaH) + (logoAreaH / 2 - lh / 2);
+      page.drawImage(img, { x: lx, y: ly, width: lw, height: lh });
       logoBottom = ly;
-    } catch(e) { console.warn("Logo embed failed:", e); }
+      console.log("Logo embedded successfully at:", lx, ly, "size:", lw, "x", lh);
+    } catch (e) {
+      console.error("Logo embed failed:", e);
+      console.error("Error details:", e instanceof Error ? e.message : String(e));
+      console.error("Stack trace:", e instanceof Error ? e.stack : "No stack trace");
+    }
   }
 
   // Separator – below logo bottom and address lines
@@ -175,7 +240,8 @@ export async function generateCustomInvoicePdf(data: CustomInvoiceFormData): Pro
   // ║  SECTION 2 – "Invoice" TITLE                                     ║
   // ╚══════════════════════════════════════════════════════════════════╝
   const titleY = sepY - 28;
-  raw("Invoice", PAGE_W/2, titleY, medF, { size:22, color:BLACK, align:"center" });
+  const titleW = medF.widthOfTextAtSize("Invoice", 22);
+  page.drawText("Invoice", { x: PAGE_W/2 - titleW/2, y: titleY, size: 22, font: medF, color: BLACK });
 
   // ╔══════════════════════════════════════════════════════════════════╗
   // ║  SECTION 3 – META TABLE                                          ║
@@ -395,10 +461,10 @@ export async function generateCustomInvoicePdf(data: CustomInvoiceFormData): Pro
     size: tSize, font: medF, color: RED, rotate: degrees(gAngle),
   });
 
-  // 6. "% 001" – bottom ring area (upside-down)
+  // 6. "100 %" – placed in the bottom ring area (rotated 180 degrees to be upside down, not mirrored)
   const bAngle = 180 + gAngle;
   const bRad   = bAngle * Math.PI / 180;
-  const bText  = "% 001";
+  const bText  = "100 %";
   const bSize  = 8.5;
   const bW     = medF.widthOfTextAtSize(bText, bSize);
   page.drawText(bText, {
