@@ -9,10 +9,11 @@ import {
 
 export function calculatePremiums(
   basicPremium: number,
-  additionalCovers: number
+  additionalCovers: number,
+  taxRate: number = 5
 ): PremiumTotals {
   const subtotal = basicPremium + additionalCovers;
-  const vat = Math.round(subtotal * 0.05 * 100) / 100;
+  const vat = Math.round(subtotal * (taxRate / 100) * 100) / 100;
   const totalWithVat = Math.round((subtotal + vat) * 100) / 100;
   return { subtotal, vat, totalWithVat };
 }
@@ -51,11 +52,12 @@ export function createDefaultQuoteData(): QuoteFormData {
     agencyRepairCovered: "Yes",
     basicDeductible: "AED 500/-",
     printedDate: now,
+    taxRate: 5,
   };
 }
 
 export function summarizeForReview(data: QuoteFormData) {
-  const premiums = calculatePremiums(data.basicPremium, data.additionalCovers);
+  const premiums = calculatePremiums(data.basicPremium, data.additionalCovers, data.taxRate);
   return {
     ...data,
     premiums,

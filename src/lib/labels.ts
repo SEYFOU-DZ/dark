@@ -6,6 +6,7 @@ export const FIELD_LABELS: Record<string, string> = {
   broker: "Broker",
   basicPremium: "Basic Premium (AED)",
   additionalCovers: "Additional Covers (AED)",
+  taxRate: "Tax Rate (%)",
   insuredName: "Insured Name",
   mobileNo: "Mobile No.",
   dateOfBirth: "Date of Birth",

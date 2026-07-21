@@ -43,7 +43,9 @@ const DYNAMIC_FIELDS: Record<string, TextField> = {
   basicPremium: { page: 0, x: 488, y: 720, width: 58, height: 12, align: "right" },
   additionalCovers: { page: 0, x: 505, y: 706, width: 42, height: 12, align: "right" },
   subtotal: { page: 0, x: 488, y: 692, width: 58, height: 12, align: "right" },
+  vatLabel: { page: 0, x: 297, y: 677, width: 85, height: 12 },
   vat: { page: 0, x: 498, y: 677, width: 48, height: 12, align: "right" },
+  totalWithVatLabel: { page: 0, x: 297, y: 663, width: 95, height: 12 },
   totalWithVat: { page: 0, x: 483, y: 663, width: 63, height: 12, align: "right" },
   insuredName: { page: 0, x: 124, y: 618, width: 165, height: 12 },
   mobileNo: { page: 0, x: 124, y: 604, width: 100, height: 12 },
@@ -141,7 +143,8 @@ function drawFieldText(
 
 function buildValues(data: QuoteFormData) {
   const printedDate = data.printedDate || formatDateTime();
-  const premiums = calculatePremiums(data.basicPremium, data.additionalCovers);
+  const taxRate = typeof data.taxRate === "number" ? data.taxRate : 5;
+  const premiums = calculatePremiums(data.basicPremium, data.additionalCovers, taxRate);
 
   return {
     quotationNo: data.quotationNo,
@@ -152,7 +155,9 @@ function buildValues(data: QuoteFormData) {
     basicPremium: formatCurrency(data.basicPremium),
     additionalCovers: formatCurrency(data.additionalCovers),
     subtotal: formatCurrency(premiums.subtotal),
+    vatLabel: `VAT (${taxRate}%)`,
     vat: formatCurrency(premiums.vat),
+    totalWithVatLabel: `Total + ${taxRate} % VAT`,
     totalWithVat: formatCurrency(premiums.totalWithVat),
     insuredName: data.insuredName.toUpperCase(),
     mobileNo: data.mobileNo,
@@ -207,6 +212,28 @@ function whiteoutQr(page: PDFPage) {
   });
 }
 
+/** Whiteout original static tax rate labels (VAT (5%) and Total + 5 % VAT) on page 0 */
+function whiteoutTaxRate(page: PDFPage) {
+  // Whiteout VAT (5%) label
+  page.drawRectangle({
+    x: 295,
+    y: 675,
+    width: 85,
+    height: 14,
+    color: rgb(1, 1, 1),
+    borderWidth: 0,
+  });
+  // Whiteout Total + 5 % VAT label
+  page.drawRectangle({
+    x: 295,
+    y: 661,
+    width: 95,
+    height: 14,
+    color: rgb(1, 1, 1),
+    borderWidth: 0,
+  });
+}
+
 /** Generate a QR code PNG buffer from a URL */
 async function generateQrPng(url: string): Promise<Buffer> {
   return QRCode.toBuffer(url, {
@@ -244,7 +271,7 @@ export async function generateQuotePdfBytes(data: QuoteFormData): Promise<Uint8A
     drawFieldText(page, field, values[key as keyof typeof values] ?? "", font, amiriFont);
   }
 
-  // Blank out the original static QR code on every page
+  // Blank out original static QR code on every page
   for (const page of pages) {
     whiteoutQr(page);
   }
@@ -293,6 +320,9 @@ export async function prepareBlankTemplate(): Promise<void> {
   for (const page of pages) {
     whiteoutQr(page);
   }
+
+  // Also blank tax rate percentage in the pre-processed template
+  whiteoutTaxRate(pages[0]);
 
   fs.writeFileSync(outputPath, await pdf.save());
 }

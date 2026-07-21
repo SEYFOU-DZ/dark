@@ -39,6 +39,7 @@ export const FIELD_RULES: Record<keyof QuoteFormData, FieldRule> = {
   broker: { kind: "text", maxLength: 60, required: true },
   basicPremium: { kind: "money", min: 0, max: 9999999.99, required: true },
   additionalCovers: { kind: "money", min: 0, max: 9999999.99 },
+  taxRate: { kind: "money", min: 0, max: 100, required: true },
   insuredName: { kind: "name", maxLength: 80, required: true, fullWidth: true },
   mobileNo: { kind: "mobile", maxLength: 15, required: true },
   dateOfBirth: { kind: "date", maxLength: 10, required: true },

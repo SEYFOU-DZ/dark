@@ -15,6 +15,7 @@ export const FORM_STEPS: {
       "broker",
       "basicPremium",
       "additionalCovers",
+      "taxRate",
     ],
   },
   {

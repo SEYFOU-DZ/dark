@@ -177,17 +177,17 @@ export default function CustomInvoiceForm({ isOpen, onClose, onSuccess }: Custom
   const prevStep = () => setStep(Math.max(1, step - 1));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" dir="ltr">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col text-left">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm" dir="ltr">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-4xl max-h-[100dvh] sm:max-h-[90vh] flex flex-col text-left">
         {/* Header */}
-        <div className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl shrink-0">
+        <div className="bg-white border-b border-gray-100 px-4 sm:px-6 py-4 flex items-center justify-between rounded-t-2xl shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-slate-900 rounded-lg">
               <FileText size={18} className="text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Create Custom Invoice</h2>
-              <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900">Create Custom Invoice</h2>
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-slate-500 mt-0.5">
                 <span className={step >= 1 ? "text-slate-900 font-semibold" : ""}>Header</span>
                 <ChevronRight size={10} />
                 <span className={step >= 2 ? "text-slate-900 font-semibold" : ""}>Client</span>
@@ -207,7 +207,7 @@ export default function CustomInvoiceForm({ isOpen, onClose, onSuccess }: Custom
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
           {error && (
             <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {error}
@@ -223,7 +223,7 @@ export default function CustomInvoiceForm({ isOpen, onClose, onSuccess }: Custom
           {/* STEP 1: Company Header Selection */}
           <div className={step === 1 ? 'block' : 'hidden'}>
             <h3 className="text-base font-bold text-slate-900 mb-4">Select Company Header</h3>
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 h-[400px] overflow-y-auto">
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 h-[350px] sm:h-[400px] overflow-y-auto">
               <CompanyHeadersList
                 selectedId={data.companyHeaderId}
                 onSelect={handleHeaderSelect}
@@ -236,7 +236,7 @@ export default function CustomInvoiceForm({ isOpen, onClose, onSuccess }: Custom
           <div className={step === 2 ? 'block' : 'hidden'}>
             <h3 className="text-base font-bold text-slate-900 mb-4">Client Details & Billing Dates</h3>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Client Name</label>
                   <input
@@ -259,7 +259,7 @@ export default function CustomInvoiceForm({ isOpen, onClose, onSuccess }: Custom
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Phone Number</label>
                   <input
@@ -282,7 +282,7 @@ export default function CustomInvoiceForm({ isOpen, onClose, onSuccess }: Custom
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1.5">Issue Date</label>
                   <input
@@ -333,8 +333,8 @@ export default function CustomInvoiceForm({ isOpen, onClose, onSuccess }: Custom
             
             <div className="space-y-3">
               {data.items.map((item, index) => (
-                <div key={item.id} className="grid grid-cols-12 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl items-start relative group">
-                  <div className="col-span-12 md:col-span-5 space-y-2">
+                <div key={item.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl items-start relative group">
+                  <div className="col-span-1 sm:col-span-5 space-y-2">
                     <input
                       type="text"
                       placeholder="Description (Arabic)"
@@ -352,7 +352,7 @@ export default function CustomInvoiceForm({ isOpen, onClose, onSuccess }: Custom
                       dir="ltr"
                     />
                   </div>
-                  <div className="col-span-4 md:col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <label className="block text-[10px] text-slate-500 mb-1">Qty</label>
                     <input
                       type="number"
@@ -362,7 +362,7 @@ export default function CustomInvoiceForm({ isOpen, onClose, onSuccess }: Custom
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none text-center focus:border-slate-900"
                     />
                   </div>
-                  <div className="col-span-4 md:col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <label className="block text-[10px] text-slate-500 mb-1">Unit Price</label>
                     <input
                       type="number"
@@ -373,13 +373,13 @@ export default function CustomInvoiceForm({ isOpen, onClose, onSuccess }: Custom
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none text-center focus:border-slate-900"
                     />
                   </div>
-                  <div className="col-span-4 md:col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <label className="block text-[10px] text-slate-500 mb-1">Total</label>
                     <div className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-center font-bold text-slate-800">
                       {item.total.toFixed(2)}
                     </div>
                   </div>
-                  <div className="col-span-12 md:col-span-1 flex justify-center items-center h-full pt-4">
+                  <div className="col-span-1 sm:col-span-1 flex justify-center items-center h-full pt-4">
                     {data.items.length > 1 && (
                       <button
                         type="button"
@@ -490,11 +490,11 @@ export default function CustomInvoiceForm({ isOpen, onClose, onSuccess }: Custom
         </div>
 
         {/* Footer Actions */}
-        <div className="border-t border-gray-100 p-4 bg-gray-50 flex items-center justify-between rounded-b-2xl shrink-0">
+        <div className="border-t border-gray-100 p-4 bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 rounded-b-2xl shrink-0">
           <button
             type="button"
             onClick={step === 1 ? onClose : prevStep}
-            className="px-5 py-2.5 bg-white border border-gray-200 text-slate-700 rounded-xl hover:bg-gray-50 transition text-sm font-medium"
+            className="w-full sm:w-auto px-5 py-2.5 bg-white border border-gray-200 text-slate-700 rounded-xl hover:bg-gray-50 transition text-sm font-medium"
           >
             {step === 1 ? 'Cancel' : 'Back'}
           </button>
@@ -504,7 +504,7 @@ export default function CustomInvoiceForm({ isOpen, onClose, onSuccess }: Custom
               type="button"
               onClick={nextStep}
               disabled={step === 1 && !data.companyHeaderId}
-              className="flex items-center gap-1.5 px-5 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-700 transition text-sm font-medium disabled:opacity-50"
+              className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-5 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-700 transition text-sm font-medium disabled:opacity-50"
             >
               Next <ChevronRight size={16} />
             </button>
@@ -512,7 +512,7 @@ export default function CustomInvoiceForm({ isOpen, onClose, onSuccess }: Custom
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-700 transition text-sm font-medium disabled:opacity-50"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-700 transition text-sm font-medium disabled:opacity-50"
             >
               {loading ? (
                 <span>Generating PDF...</span>

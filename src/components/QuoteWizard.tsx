@@ -47,8 +47,8 @@ export function QuoteWizard({ onClose, onSuccess }: QuoteWizardProps) {
   const progress = ((step + 1) / totalSteps) * 100;
 
   const premiums = useMemo(
-    () => calculatePremiums(data.basicPremium, data.additionalCovers),
-    [data.basicPremium, data.additionalCovers]
+    () => calculatePremiums(data.basicPremium, data.additionalCovers, data.taxRate),
+    [data.basicPremium, data.additionalCovers, data.taxRate]
   );
 
   const review = useMemo(() => summarizeForReview(data), [data]);
@@ -200,7 +200,7 @@ export function QuoteWizard({ onClose, onSuccess }: QuoteWizardProps) {
                 <Card className="mb-5 border-slate-200 bg-slate-50/50 shadow-none">
                   <CardContent className="grid gap-3 p-4 sm:grid-cols-3">
                     <Stat label={tr("total")} value={`${formatCurrency(premiums.subtotal)} AED`} />
-                    <Stat label={tr("vat")} value={`${formatCurrency(premiums.vat)} AED`} />
+                    <Stat label={`VAT (${data.taxRate}%)`} value={`${formatCurrency(premiums.vat)} AED`} />
                     <Stat label={tr("totalVat")} value={`${formatCurrency(premiums.totalWithVat)} AED`} />
                   </CardContent>
                 </Card>

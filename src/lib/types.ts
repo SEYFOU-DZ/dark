@@ -46,6 +46,7 @@ export interface QuoteFormData {
   agencyRepairCovered: YesNo;
   basicDeductible: string;
   printedDate: string;
+  taxRate: number;
 }
 
 export interface PremiumTotals {
