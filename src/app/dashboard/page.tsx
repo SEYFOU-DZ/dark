@@ -4,12 +4,13 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getUser, logout } from '@/lib/auth';
 import { apiJson } from '@/lib/api';
-import { LayoutDashboard, FileText, Receipt, Users, LogOut, Languages, Plus, Clock, CheckCircle, XCircle, Eye, Download, Bell, ShieldCheck, Sparkles, Send, Menu, X } from 'lucide-react';
+import { LayoutDashboard, FileText, Receipt, Users, LogOut, Languages, Plus, Clock, CheckCircle, XCircle, Eye, Download, Bell, ShieldCheck, Sparkles, Send, Menu, X, Building2 } from 'lucide-react';
 import { QuoteWizard } from '@/components/QuoteWizard';
 import { InvoiceWizard } from '@/components/InvoiceWizard';
 import UsersManagement from '@/components/dashboard/UsersManagement';
 import CustomInvoiceForm from '@/components/admin/CustomInvoiceForm';
 import CustomInvoicesList from '@/components/admin/CustomInvoicesList';
+import CompanyHeadersList from '@/components/admin/CompanyHeadersList';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -280,6 +281,8 @@ export default function DashboardPage() {
       userCreated: { en: 'User added', ar: 'تمت إضافة المستخدم' },
       customInvoices: { en: 'Custom Invoices', ar: 'الفواتير المخصصة' },
       createCustomInvoice: { en: 'Create Custom Invoice', ar: 'إنشاء فاتورة مخصصة' },
+      companyHeaders: { en: 'Company Headers', ar: 'ترويسات الشركات' },
+      companyHeadersDesc: { en: 'Manage company headers for custom invoices', ar: 'إدارة ترويسات الشركات للفواتير المخصصة' },
     };
     return translations[key]?.[locale] || key;
   };
@@ -308,6 +311,7 @@ export default function DashboardPage() {
   if (isAdmin) {
     menuItems.push({ id: 'users', icon: Users });
     menuItems.push({ id: 'custom-invoices', icon: Sparkles });
+    menuItems.push({ id: 'company-headers', icon: Building2 });
   }
 
   const handleLogout = () => {
@@ -739,6 +743,35 @@ export default function DashboardPage() {
               </Card>
             )}
 
+            {activeTab === 'custom-invoices' && isAdmin && (
+              <div className="space-y-6">
+                <CustomInvoicesList
+                  locale={locale}
+                  refreshKey={customInvoicesRefresh}
+                  onRefresh={() => setCustomInvoicesRefresh(prev => prev + 1)}
+                />
+                <Button
+                  onClick={() => setShowCustomInvoiceForm(true)}
+                  className="w-full sm:w-auto"
+                >
+                  <Plus className="h-4 w-4 ml-2" />
+                  {t('createCustomInvoice')}
+                </Button>
+              </div>
+            )}
+
+            {activeTab === 'company-headers' && isAdmin && (
+              <Card className="border-slate-200/80 shadow-sm">
+                <CardHeader className="border-b border-slate-100">
+                  <CardTitle className="text-slate-800">{t('companyHeaders')}</CardTitle>
+                  <CardDescription className="text-slate-500">{t('companyHeadersDesc')}</CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  <CompanyHeadersList showSelector={false} />
+                </CardContent>
+              </Card>
+            )}
+
             {activeTab === 'invoices' && (
               <Card className="border-slate-200/80 shadow-sm">
                 <CardHeader className="border-b border-slate-100">
@@ -840,20 +873,7 @@ export default function DashboardPage() {
               <UsersManagement locale={locale} />
             )}
 
-            {activeTab === 'custom-invoices' && isAdmin && (
-              <>
-                <div className="mb-6">
-                  <Button onClick={() => setShowCustomInvoiceForm(true)}>
-                    <Plus className="h-4 w-4 ml-2" />
-                    {t('createCustomInvoice')}
-                  </Button>
-                </div>
-                <CustomInvoicesList 
-                  locale={locale} 
-                  onRefresh={() => setCustomInvoicesRefresh(prev => prev + 1)}
-                />
-              </>
-            )}
+
           </main>
         </div>
       </div>
@@ -872,7 +892,6 @@ export default function DashboardPage() {
       )}
       {showCustomInvoiceForm && (
         <CustomInvoiceForm
-          locale={locale}
           isOpen={showCustomInvoiceForm}
           onClose={() => setShowCustomInvoiceForm(false)}
           onSuccess={() => {

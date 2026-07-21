@@ -15,9 +15,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate totals
-    const subtotal = body.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const taxAmount = (subtotal * body.taxRate) / 100;
-    const total = subtotal + taxAmount;
+    const subtotal = body.items.reduce(
+      (sum, item) => sum + item.unitPrice * item.quantity,
+      0
+    );
+    const discount = body.discount || 0;
+    const taxableBase = subtotal - discount;
+    const taxAmount = (taxableBase * (body.taxRate || 15)) / 100;
+    const total = taxableBase + taxAmount;
 
     // Generate PDF
     const pdfBytes = await generateCustomInvoicePdf(body);
@@ -25,41 +30,50 @@ export async function POST(request: NextRequest) {
     // Upload to Cloudinary
     let storageUrl = "";
     try {
-      storageUrl = await uploadPdfToCloudinary(pdfBytes, body.invoiceNo, "custom-invoices");
+      storageUrl = await uploadPdfToCloudinary(
+        pdfBytes,
+        body.invoiceNo,
+        "custom-invoices"
+      );
     } catch (uploadError) {
       console.warn("Cloudinary upload skipped:", uploadError);
     }
 
     // Save to backend
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const authHeader = request.headers.get('authorization') || '';
+      const backendUrl =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+      const authHeader = request.headers.get("authorization") || "";
       const response = await fetch(`${backendUrl}/api/custom-invoices`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authHeader,
+          "Content-Type": "application/json",
+          Authorization: authHeader,
         },
         body: JSON.stringify({
           ...body,
-          items: body.items.map(item => ({
+          items: body.items.map((item) => ({
             ...item,
-            total: item.price * item.quantity
+            total: item.unitPrice * item.quantity,
           })),
           subtotal,
           taxAmount,
+          discount,
           total,
           pdfUrl: storageUrl,
         }),
       });
 
       if (!response.ok) {
-        console.warn('Backend save failed, but PDF will still be returned');
+        console.warn("Backend save failed, but PDF will still be returned");
       } else {
-        console.log('Invoice saved successfully to backend');
+        console.log("Invoice saved successfully to backend");
       }
     } catch (backendError) {
-      console.warn('Backend save failed, but PDF will still be returned:', backendError);
+      console.warn(
+        "Backend save failed, but PDF will still be returned:",
+        backendError
+      );
     }
 
     return new NextResponse(Buffer.from(pdfBytes), {
@@ -81,21 +95,24 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    const backendUrl =
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    const token = request.cookies.get("token")?.value;
     const response = await fetch(`${backendUrl}/api/custom-invoices`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
+      cache: "no-store",
     });
 
     if (!response.ok) {
-      console.warn('Backend fetch failed, returning empty list');
+      console.warn("Backend fetch failed, returning empty list");
       return NextResponse.json([]);
     }
 
     const data = await response.json();
-    console.log('Fetched invoices:', data.length);
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error fetching custom invoices:", error);

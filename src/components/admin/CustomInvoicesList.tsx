@@ -9,19 +9,23 @@ interface CustomInvoice {
   invoiceNo: string;
   invoiceDate: string;
   currency: string;
-  companyName: string;
+  clientName: string;
+  companyHeaderSnapshot?: {
+    companyNameEn: string;
+    companyNameAr: string;
+  };
   total: number;
   pdfUrl: string;
-  language: string;
   createdAt: string;
 }
 
 interface CustomInvoicesListProps {
   locale: string;
+  refreshKey?: number;
   onRefresh?: () => void;
 }
 
-export default function CustomInvoicesList({ locale, onRefresh }: CustomInvoicesListProps) {
+export default function CustomInvoicesList({ locale, refreshKey, onRefresh }: CustomInvoicesListProps) {
   const [invoices, setInvoices] = useState<CustomInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -33,10 +37,10 @@ export default function CustomInvoicesList({ locale, onRefresh }: CustomInvoices
       noInvoices: { en: 'No custom invoices yet', ar: 'لا توجد فواتير مخصصة' },
       startInvoice: { en: 'Start by creating a new custom invoice', ar: 'ابدأ بإنشاء فاتورة مخصصة جديدة' },
       invoiceNo: { en: 'Invoice #', ar: 'رقم الفاتورة #' },
-      company: { en: 'Company', ar: 'الشركة' },
+      company: { en: 'Company Header', ar: 'ترويسة الشركة' },
+      client: { en: 'Client', ar: 'العميل' },
       amount: { en: 'Amount', ar: 'المبلغ' },
       date: { en: 'Date', ar: 'التاريخ' },
-      language: { en: 'Language', ar: 'اللغة' },
       actions: { en: 'Actions', ar: 'الإجراءات' },
       view: { en: 'View', ar: 'عرض' },
       download: { en: 'Download', ar: 'تحميل' },
@@ -48,7 +52,7 @@ export default function CustomInvoicesList({ locale, onRefresh }: CustomInvoices
 
   useEffect(() => {
     fetchInvoices();
-  }, [onRefresh]);
+  }, [refreshKey, onRefresh]);
 
   const fetchInvoices = async () => {
     try {
@@ -111,9 +115,9 @@ export default function CustomInvoicesList({ locale, onRefresh }: CustomInvoices
                 <tr>
                   <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('invoiceNo')}</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('company')}</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('client')}</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('amount')}</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('date')}</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('language')}</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('actions')}</th>
                 </tr>
               </thead>
@@ -124,16 +128,16 @@ export default function CustomInvoicesList({ locale, onRefresh }: CustomInvoices
                       {invoice.invoiceNo}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {invoice.companyName || '-'}
+                      {invoice.companyHeaderSnapshot?.companyNameAr || invoice.companyHeaderSnapshot?.companyNameEn || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {invoice.clientName || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                       {invoice.total.toFixed(2)} {invoice.currency}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {new Date(invoice.invoiceDate).toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-GB')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {invoice.language === 'ar' ? 'العربية' : 'English'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2 space-x-reverse">
                       <a

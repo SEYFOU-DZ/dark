@@ -1,44 +1,79 @@
+// ─── Company Header (the saved reusable top section) ─────────────────────────
+export interface AddressLine {
+  ar: string;
+  en: string;
+}
+
+export interface CompanyHeader {
+  _id: string;
+  name?: string;           // Optional internal label
+  companyName: string;     // Single company name shown top-left and top-right
+  addressLines: AddressLine[];
+  logoUrl?: string;        // Base64 or URL
+  createdAt?: string;
+}
+
+// ─── Invoice Item (bilingual) ─────────────────────────────────────────────────
 export interface CustomInvoiceItem {
   id: string;
-  description: string;
+  descriptionAr: string;
+  descriptionEn: string;
   quantity: number;
-  price: number;
+  unitPrice: number;
   total: number;
 }
 
+// ─── Full Invoice Form Data ───────────────────────────────────────────────────
 export interface CustomInvoiceFormData {
   invoiceNo: string;
-  invoiceDate: string;
-  currency: string;
+  companyHeaderId?: string;
+  companyHeaderSnapshot?: {
+    companyName: string;
+    addressLines: AddressLine[];
+    logoUrl?: string;
+  };
   logoUrl?: string;
+  companyName?: string;
+  // Client Info
+  clientName: string;
+  clientPhone: string;
+  clientEmail: string;
+  clientAddress: string;
+  // Dates
+  invoiceDate: string;
+  dueDate: string;
+  // Financials
+  currency: string;
   items: CustomInvoiceItem[];
   taxRate: number;
-  notes: string[]; // Array of notes instead of single string
-  signatureType: 'manual' | 'image';
-  signatureData?: string; // Base64 for manual signature or image URL
-  language: 'ar' | 'en';
-  companyName?: string;
-  companyAddress?: string;
+  discount: number;
+  // Notes list
+  notes: string[];
 }
 
+// ─── Default form state ───────────────────────────────────────────────────────
 export const DEFAULT_CUSTOM_INVOICE_DATA: CustomInvoiceFormData = {
-  invoiceNo: '', // Will be auto-generated
+  invoiceNo: '',
+  companyHeaderId: '',
+  companyHeaderSnapshot: undefined,
+  clientName: '',
+  clientPhone: '',
+  clientEmail: '',
+  clientAddress: '',
   invoiceDate: new Date().toISOString().split('T')[0],
+  dueDate: '',
   currency: 'SAR',
   items: [
     {
       id: '1',
-      description: '',
+      descriptionAr: '',
+      descriptionEn: '',
       quantity: 1,
-      price: 0,
+      unitPrice: 0,
       total: 0,
     },
   ],
   taxRate: 15,
-  notes: [], // Array of notes
-  signatureType: 'manual',
-  signatureData: '',
-  language: 'ar',
-  companyName: '',
-  companyAddress: '',
+  discount: 0,
+  notes: [''],
 };

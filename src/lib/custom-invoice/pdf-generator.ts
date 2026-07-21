@@ -1,440 +1,424 @@
 import fs from "fs";
 import path from "path";
-import {
-  PDFDocument,
-  rgb,
-  StandardFonts,
-  type PDFFont,
-} from "pdf-lib";
+import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage, degrees } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 // @ts-expect-error arabic-persian-reshaper does not ship TypeScript types.
 import reshaper from "arabic-persian-reshaper";
 import type { CustomInvoiceFormData } from "./types";
 
-// Font sizes
-const FS_TITLE = 32;
-const FS_HEADING = 14;
-const FS_NORMAL = 11;
-const FS_SMALL = 10;
+// ─── Page constants (A4) ─────────────────────────────────────────────────────
+const PAGE_W = 595.28;
+const PAGE_H  = 841.89;
+const ML      = 40;
+const MR      = 40;
+const MT      = 36;
+const CNTW    = PAGE_W - ML - MR;
 
-// Colors - Professional dark theme (pencil-like dark gray)
-const COLOR_DARK = rgb(0.2, 0.2, 0.2);
-const COLOR_WHITE = rgb(1, 1, 1);
-const COLOR_GRAY = rgb(0.5, 0.5, 0.5);
-const COLOR_LIGHT_GRAY = rgb(0.95, 0.95, 0.95);
-const COLOR_BORDER = rgb(0.9, 0.9, 0.9);
+// ─── Colors ──────────────────────────────────────────────────────────────────
+const BLACK = rgb(0,    0,    0   );
+const DARK  = rgb(0.12, 0.12, 0.12);
+const GRAY  = rgb(0.45, 0.45, 0.45);
+const LGRAY = rgb(0.80, 0.80, 0.80);
+const RED   = rgb(0.75, 0.05, 0.05);
 
-// Page dimensions (A4)
-const PAGE_WIDTH = 595.28;
-const PAGE_HEIGHT = 841.89;
-const MARGIN = 50;
-
-function hasArabic(text: string): boolean {
-  return /[\u0600-\u06FF]/.test(text);
+// ─── Arabic reshaper ─────────────────────────────────────────────────────────
+function hasAr(text: string): boolean { return /[\u0600-\u06FF]/.test(text); }
+function shapeAr(text: string): string {
+  if (!text || !hasAr(text)) return text;
+  try {
+    const shaped = reshaper.ArabicShaper.convertArabic(text.trim());
+    const parts  = shaped.match(/([\u0600-\u06FF\u200C\u200D\s]+)|([^\u0600-\u06FF]+)/g);
+    if (!parts) return shaped.split("").reverse().join("");
+    return parts
+      .map((p: string) => hasAr(p) ? p.split("").reverse().join("") : p)
+      .reverse().join("");
+  } catch { return text; }
 }
 
-function shapeArabic(text: string): string {
-  const trimmed = text.trim();
-  if (!hasArabic(trimmed)) return trimmed;
+// ─── Drawing helpers ─────────────────────────────────────────────────────────
+type Fnt  = PDFFont;
+type Clr  = ReturnType<typeof rgb>;
+type Opts = {
+  size?  : number;
+  font?  : Fnt;
+  color? : Clr;
+  align? : "left" | "center" | "right";
+  arabic?: boolean;
+};
 
-  const shaped = reshaper.ArabicShaper.convertArabic(trimmed);
-  const parts = shaped.match(/([\u0600-\u06FF\s]+)|([^\u0600-\u06FF]+)/g);
-  if (!parts) return shaped.split("").reverse().join("");
-
-  const reversedParts = parts.map((part: string) => {
-    if (hasArabic(part)) {
-      return part.split("").reverse().join("");
+/** Base draw: caller supplies the exact font.
+ *  fakeBold=true draws the glyph twice at +0.45px offset to simulate bold weight. */
+function baseDraw(page: PDFPage) {
+  return (text: string, x: number, y: number, font: Fnt, opts: Opts = {}, fakeBold = false) => {
+    const { size = 9, color = DARK, align = "left", arabic = false } = opts;
+    const isAr = arabic || hasAr(text);
+    const str  = isAr ? shapeAr(text) : text;
+    if (!str) return;
+    const w = font.widthOfTextAtSize(str, size);
+    let dx = x;
+    if (align === "right")  dx = x - w;
+    if (align === "center") dx = x - w / 2;
+    page.drawText(str, { x: dx, y, size, font, color });
+    if (fakeBold) {
+      page.drawText(str, { x: dx + 0.45, y, size, font, color });
     }
-    return part;
-  });
-
-  return reversedParts.reverse().join("");
+  };
 }
 
-export async function generateCustomInvoicePdf(
-  data: CustomInvoiceFormData
-): Promise<Uint8Array> {
+function hl(page: PDFPage, x1: number, y: number, x2: number, t = 0.4, c: Clr = LGRAY) {
+  page.drawLine({ start:{ x:x1, y }, end:{ x:x2, y }, thickness:t, color:c });
+}
+function vl(page: PDFPage, x: number, y1: number, y2: number, t = 0.4, c: Clr = LGRAY) {
+  page.drawLine({ start:{ x, y:y1 }, end:{ x, y:y2 }, thickness:t, color:c });
+}
+
+// ─── Main generator ───────────────────────────────────────────────────────────
+export async function generateCustomInvoicePdf(data: CustomInvoiceFormData): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
 
-  // Load fonts
-  const latinFont = await pdf.embedFont(StandardFonts.Helvetica);
-  const latinBoldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
-  
-  // Load Arabic font
-  let arabicFont: PDFFont;
+  const fontsDir = path.join(process.cwd(), "public", "fonts");
+
+  // ── Latin fonts ──
+  let regF: Fnt, medF: Fnt, heavyF: Fnt;
   try {
-    const arabicFontBytes = fs.readFileSync(
-      path.join(process.cwd(), "public", "fonts", "Amiri.ttf")
-    );
-    arabicFont = await pdf.embedFont(arabicFontBytes);
-  } catch (e) {
-    console.warn('Could not load Arabic font, using Helvetica');
-    arabicFont = latinFont;
+    regF   = await pdf.embedFont(fs.readFileSync(path.join(fontsDir, "Arial.ttf")));
+    heavyF = await pdf.embedFont(fs.readFileSync(path.join(fontsDir, "ArialBlack.ttf")));
+  } catch {
+    regF   = await pdf.embedFont(StandardFonts.Helvetica);
+    heavyF = await pdf.embedFont(StandardFonts.HelveticaBold);
+  }
+  medF = await pdf.embedFont(StandardFonts.HelveticaBold); // medium label weight
+
+  // ── Arabic font ──
+  let arRegF: Fnt = regF;
+  for (const fn of ["NotoSansArabic-Regular.ttf", "Amiri.ttf", "DroidArabicNaskh.ttf"]) {
+    try { arRegF = await pdf.embedFont(fs.readFileSync(path.join(fontsDir, fn))); break; }
+    catch { /**/ }
   }
 
-  const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-  const isArabic = data.language === 'ar';
+  // ── Convenience draw helpers ──
+  const page = pdf.addPage([PAGE_W, PAGE_H]);
+  const raw  = baseDraw(page);
 
-  // Helper function to draw text with simple alignment
-  const drawText = (
-    text: string,
-    x: number,
-    y: number,
-    size: number = FS_NORMAL,
-    font: PDFFont = latinFont,
-    color: any = rgb(0, 0, 0),
-    align: 'left' | 'center' | 'right' = 'left'
-  ) => {
-    const isArab = hasArabic(text);
-    const activeFont = isArab ? arabicFont : font;
-    const shapedText = isArab ? shapeArabic(text) : text;
-    
-    let drawX = x;
-    const textWidth = activeFont.widthOfTextAtSize(shapedText, size);
-    
-    if (align === 'right') {
-      drawX = x - textWidth;
-    } else if (align === 'center') {
-      drawX = x - textWidth / 2;
-    }
-    // For 'left', keep x as is (start from left)
-
-    page.drawText(shapedText, {
-      x: drawX,
-      y,
-      size,
-      font: activeFont,
-      color,
-    });
+  /** Regular weight (body text) */
+  const dt = (text: string, x: number, y: number, opts: Opts = {}) => {
+    const isAr = opts.arabic || hasAr(text);
+    raw(text, x, y, isAr ? arRegF : regF, opts, false);
   };
 
-  // Header section - Flex-like layout with equal containers
-  const headerTopY = PAGE_HEIGHT - 80;
-  const headerWidth = PAGE_WIDTH - 2 * MARGIN;
-  const halfWidth = headerWidth / 2;
-  const leftContainerX = MARGIN;
-  const rightContainerX = MARGIN + halfWidth;
-  const centerY = headerTopY - 25;
-  
-  // Left container: Logo (centered in its container)
-  if (data.logoUrl) {
+  /** Medium-bold weight (labels, table headers, totals, "ملاحظات").
+   *  Arabic: uses fake-bold double-draw since no bold Arabic font is available in public/fonts. */
+  const dtM = (text: string, x: number, y: number, opts: Opts = {}) => {
+    const isAr = opts.arabic || hasAr(text);
+    raw(text, x, y, isAr ? arRegF : medF, opts, isAr);
+  };
+
+  /** Heavy weight (company name in header only). */
+  const dtH = (text: string, x: number, y: number, opts: Opts = {}) => {
+    const isAr = opts.arabic || hasAr(text);
+    raw(text, x, y, isAr ? arRegF : heavyF, opts, isAr);
+  };
+
+  // ─── Snapshot ───
+  const snap = data.companyHeaderSnapshot ?? {
+    companyName : data.companyName ?? "",
+    addressLines: [],
+    logoUrl     : data.logoUrl ?? "",
+  };
+  const logoSrc = snap.logoUrl || data.logoUrl || "";
+
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  SECTION 1 – HEADER                                              ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+  const topY = PAGE_H - MT;
+
+  // LEFT – English company name + address
+  let leftY = topY;
+  if (snap.companyName) { dtH(snap.companyName, ML, leftY, { size:12, color:BLACK }); leftY -= 15; }
+  for (const ln of snap.addressLines ?? []) {
+    if (ln.en) { dt(ln.en, ML, leftY, { size:8, color:GRAY }); leftY -= 11; }
+  }
+
+  // RIGHT – Arabic company name + address
+  let rightY = topY;
+  if (snap.companyName) { dtH(snap.companyName, PAGE_W-MR, rightY, { size:12, color:BLACK, align:"right" }); rightY -= 15; }
+  for (const ln of snap.addressLines ?? []) {
+    if (ln.ar) { dt(ln.ar, PAGE_W-MR, rightY, { size:8, color:GRAY, align:"right", arabic:true }); rightY -= 11; }
+  }
+
+  // CENTER – Logo
+  const logoAreaW = 150; const logoAreaH = 75;
+  let logoBottom  = PAGE_H - MT - logoAreaH;
+  if (logoSrc) {
     try {
-      let logoBytes: Buffer;
-      let logoImage: any;
-      
-      if (data.logoUrl.startsWith('data:image')) {
-        const base64Data = data.logoUrl.split(',')[1];
-        logoBytes = Buffer.from(base64Data, 'base64');
-        
-        if (data.logoUrl.includes('image/png')) {
-          logoImage = await pdf.embedPng(logoBytes);
-        } else if (data.logoUrl.includes('image/jpeg') || data.logoUrl.includes('image/jpg')) {
-          logoImage = await pdf.embedJpg(logoBytes);
-        } else {
-          logoImage = await pdf.embedPng(logoBytes);
-        }
-        
-        // Logo dimensions handling
-        const maxLogoWidth = halfWidth * 0.8;
-        const maxLogoHeight = 70; // Increased max height as requested
-        let logoScale = maxLogoWidth / logoImage.width;
-        let logoHeight = logoImage.height * logoScale;
-        
-        if (logoHeight > maxLogoHeight) {
-           logoScale = maxLogoHeight / logoImage.height;
-           logoHeight = maxLogoHeight;
-        }
-        const logoWidth = logoImage.width * logoScale;
-        
-        // Logo aligned to the very left edge (MARGIN)
-        const logoX = MARGIN;
-        const logoY = centerY - logoHeight / 2;
-        
-        page.drawImage(logoImage, {
-          x: logoX,
-          y: logoY,
-          width: logoWidth,
-          height: logoHeight,
-        });
-      }
-    } catch (e) {
-      console.warn('Failed to embed logo:', e);
+      const buf = logoSrc.startsWith("data:image")
+        ? Buffer.from(logoSrc.split(",")[1], "base64")
+        : fs.readFileSync(logoSrc);
+      const img = (logoSrc.includes("image/png") || logoSrc.endsWith(".png"))
+        ? await pdf.embedPng(buf) : await pdf.embedJpg(buf);
+      let sc = logoAreaW / img.width;
+      if (img.height * sc > logoAreaH) sc = logoAreaH / img.height;
+      const lw = img.width*sc, lh = img.height*sc;
+      const lx = PAGE_W/2 - lw/2;
+      const ly = (PAGE_H - MT - logoAreaH) + (logoAreaH/2 - lh/2);
+      page.drawImage(img, { x:lx, y:ly, width:lw, height:lh });
+      logoBottom = ly;
+    } catch(e) { console.warn("Logo embed failed:", e); }
+  }
+
+  // Separator – below logo bottom and address lines
+  const sepY = Math.min(leftY, rightY, logoBottom) - 16;
+  hl(page, ML, sepY, PAGE_W-MR, 1.2, LGRAY);
+
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  SECTION 2 – "Invoice" TITLE                                     ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+  const titleY = sepY - 28;
+  raw("Invoice", PAGE_W/2, titleY, medF, { size:22, color:BLACK, align:"center" });
+
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  SECTION 3 – META TABLE                                          ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+  const rowH    = 18;
+  const tallH   = rowH * 2;
+  const metaTop = titleY - 14;
+
+  const normalRows = [
+    { labelEn:"Customer",  labelAr:"العميل",             value: data.clientName    || "" },
+    { labelEn:"Address",   labelAr:"العنوان",             value: data.clientAddress || "" },
+    { labelEn:"Email",     labelAr:"البريد الإلكتروني",   value: data.clientEmail   || "" },
+    { labelEn:"Phone",     labelAr:"الهاتف",              value: data.clientPhone   || "" },
+  ];
+
+  const normalH = normalRows.length * rowH;
+  const metaH   = normalH + tallH;
+  const metaBot = metaTop - metaH;
+
+  // Outer border
+  page.drawRectangle({ x:ML, y:metaBot, width:CNTW, height:metaH, opacity:0, borderColor:LGRAY, borderWidth:0.5 });
+
+  // Normal rows
+  normalRows.forEach((row, i) => {
+    const rowTop = metaTop - i * rowH;
+    const ty     = rowTop - rowH + 5;
+    if (i > 0) hl(page, ML, rowTop, PAGE_W-MR, 0.4, LGRAY);
+    dtM(row.labelEn,  ML+6,        ty, { size:8.5, color:DARK });
+    dt (row.value,    PAGE_W/2,    ty, { size:8.5, color:DARK, align:"center" });
+    dtM(row.labelAr,  PAGE_W-MR-6, ty, { size:8.5, color:DARK, align:"right", arabic:true });
+  });
+
+  // Tall combined last row
+  const tallTop = metaTop - normalH;
+  hl(page, ML, tallTop, PAGE_W-MR, 0.4, LGRAY);
+
+  // Vertical divider in the tall row
+  const halfX = ML + CNTW/2;
+  vl(page, halfX, metaBot, tallTop, 0.4, LGRAY);
+
+  // LEFT half: Invoice number (top) + Due date (bottom), NO line
+  const leftTopTy  = tallTop - rowH + 5;
+  const leftBotTy  = tallTop - rowH - rowH + 5;
+
+  dtM("Invoice number", ML+6,            leftTopTy, { size:8.5, color:DARK });
+  dt (data.invoiceNo||"", (ML+halfX)/2,  leftTopTy, { size:8.5, color:DARK, align:"center" });
+  dtM("رقم الفاتورة",   halfX-6,         leftTopTy, { size:8.5, color:DARK, align:"right", arabic:true });
+
+  dtM("Due date",       ML+6,            leftBotTy, { size:8.5, color:DARK });
+  dt (data.dueDate||"", (ML+halfX)/2,    leftBotTy, { size:8.5, color:DARK, align:"center" });
+  dtM("تاريخ الاستحقاق",halfX-6,         leftBotTy, { size:8.5, color:DARK, align:"right", arabic:true });
+
+  // RIGHT half: Date (vertically centered)
+  const rightCy = tallTop - tallH/2 + 2;
+  dtM("Date",             halfX+6,            rightCy, { size:8.5, color:DARK });
+  dt (data.invoiceDate||"",(halfX+PAGE_W-MR)/2,rightCy,{ size:8.5, color:DARK, align:"center" });
+  dtM("التاريخ",          PAGE_W-MR-6,        rightCy, { size:8.5, color:DARK, align:"right", arabic:true });
+
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  SECTION 4 – ITEMS TABLE                                         ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+  const thH      = 22;
+  const itemRowH = 28;
+  const itemsTop = metaBot - 16;
+
+  const CW = { idx:28, desc:158, qty:40, price:70, taxable:76, vat:65, total:78 };
+  const xR       = PAGE_W - MR;
+  const xIdx     = xR - CW.idx;
+  const xDesc    = xIdx - CW.desc;
+  const xQty     = xDesc - CW.qty;
+  const xPrice   = xQty  - CW.price;
+  const xTaxable = xPrice - CW.taxable;
+  const xVat     = xTaxable - CW.vat;
+
+  const itemsBoxH = thH + data.items.length * itemRowH;
+
+  // Outer border only
+  page.drawRectangle({ x:ML, y:itemsTop-itemsBoxH, width:CNTW, height:itemsBoxH, opacity:0, borderColor:LGRAY, borderWidth:0.5 });
+  hl(page, ML, itemsTop,     PAGE_W-MR, 0.5, LGRAY);
+  hl(page, ML, itemsTop-thH, PAGE_W-MR, 0.5, LGRAY);
+
+  const thY = itemsTop - thH + 7;
+  const drawTH = (label: string, cx: number) =>
+    dtM(label, cx, thY, { size:8, color:DARK, align:"center", arabic: hasAr(label) });
+
+  drawTH("#",                      xIdx     + CW.idx/2);
+  drawTH("الوصف",                  xDesc    + CW.desc/2);
+  drawTH("الكمية",                 xQty     + CW.qty/2);
+  drawTH("السعر",                  xPrice   + CW.price/2);
+  drawTH("المبلغ الخاضع للضريبة",  xTaxable + CW.taxable/2);
+  drawTH("القيمة المضافة",         xVat     + CW.vat/2);
+  drawTH("المجموع",                ML       + CW.total/2);
+
+  let curY = itemsTop - thH;
+  data.items.forEach((item, i) => {
+    if (i > 0) hl(page, ML, curY, PAGE_W-MR, 0.3, LGRAY);
+
+    const ty  = curY - 13;
+    const ty2 = curY - 21;
+
+    const lineTotal = item.unitPrice * item.quantity;
+    const itemTax   = (lineTotal * (data.taxRate || 0)) / 100;
+    const lineGross = lineTotal + itemTax;
+
+    dt(String(i + 1), xIdx + CW.idx/2, ty, { size:8.5, color:DARK, align:"center" });
+
+    if (item.descriptionAr) dtM(item.descriptionAr, xIdx-5, ty,  { size:8.5, color:DARK, align:"right", arabic:true });
+    if (item.descriptionEn) dt (item.descriptionEn, xIdx-5, ty2, { size:7.5, color:GRAY, align:"right" });
+
+    dt(String(item.quantity),      xQty     + CW.qty/2,     ty, { size:8.5, color:DARK, align:"center" });
+    dt(item.unitPrice.toFixed(2),  xPrice   + CW.price/2,   ty, { size:8.5, color:DARK, align:"center" });
+    dt(lineTotal.toFixed(2),       xTaxable + CW.taxable/2, ty, { size:8.5, color:DARK, align:"center" });
+    dt(itemTax.toFixed(2),         xVat     + CW.vat/2,     ty, { size:8.5, color:DARK, align:"center" });
+    dt(lineGross.toFixed(2),       ML       + CW.total/2,   ty, { size:8.5, color:DARK, align:"center" });
+
+    curY -= itemRowH;
+  });
+
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  SECTION 5 – TOTALS (left side)                                  ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+  const subtotal = data.items.reduce((s, it) => s + it.unitPrice * it.quantity, 0);
+  const disc     = data.discount || 0;
+  const taxBase  = subtotal - disc;
+  const taxAmt   = (taxBase * (data.taxRate || 0)) / 100;
+  const grand    = taxBase + taxAmt;
+  const curr     = data.currency || "SAR";
+
+  const totRows = [
+    { label:"المجموع الفرعي",               val: subtotal },
+    ...(disc > 0 ? [{ label:"الخصم",         val: disc }] : []),
+    { label:"إجمالي ضريبة القيمة المضافة",   val: taxAmt  },
+    { label:"المجموع شامل القيمة المضافة",   val: grand   },
+  ];
+
+  const totalsStartY = curY - 18;
+  const totSpacing   = 19;
+  const totRightX    = ML + CNTW * 0.42;
+
+  let totY = totalsStartY;
+  for (const row of totRows) {
+    const valStr = row.val.toFixed(2);
+    dtM(valStr, ML, totY, { size:9, color:BLACK });
+    dtM(curr,   ML + medF.widthOfTextAtSize(valStr, 9) + 3, totY, { size:9, color:BLACK });
+    dtM(row.label, totRightX, totY, { size:9, color:BLACK, align:"right", arabic:true });
+    totY -= totSpacing;
+  }
+
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  SECTION 6 – NOTES (right side, BELOW where totals end)         ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+  const notesList = (
+    Array.isArray(data.notes) ? data.notes : (data.notes ? [data.notes as string] : [])
+  ).filter((n: string) => n && n.trim());
+
+  if (notesList.length > 0) {
+    let nY = totY - 2;
+    dtM("ملاحظات", PAGE_W-MR, nY, { size:9, color:BLACK, align:"right", arabic:true });
+    nY -= 14;
+    for (const note of notesList) {
+      dt(note.trim(), PAGE_W-MR, nY, { size:8.5, color:GRAY, align:"right", arabic: hasAr(note) });
+      nY -= 13;
     }
   }
 
-  // Right container: INVOICE title (aligned to the right edge)
-  const invoiceTitle = isArabic ? 'الفاتورة' : 'INVOICE';
-  drawText(invoiceTitle, PAGE_WIDTH - MARGIN, centerY - FS_TITLE / 3, FS_TITLE, latinBoldFont, COLOR_DARK, 'right');
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  SECTION 7 – GUARANTEE STAMP (bottom-left)                      ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+  const stampCx = ML + 60;
+  const stampCy = totY - 68;
+  const outerR  = 46;
+  const innerR  = 23; // Shrunken inner circle to expand ring space
 
-  // Second row: Company name on the left, Date & Invoice No on the right
-  const secondRowY = centerY - 60;
-  
-  // Company name aligned to the left edge
-  if (data.companyName) {
-    drawText(data.companyName, MARGIN, secondRowY, FS_HEADING + 2, latinBoldFont, COLOR_DARK, 'left');
-  }
+  // 1. Outer circle (solid thick red border)
+  page.drawEllipse({ x:stampCx, y:stampCy, xScale:outerR, yScale:outerR, borderColor:RED, borderWidth:3.5, opacity:0 });
 
-  // Date and Invoice No (aligned to the right edge)
-  const invoiceNoLabel = isArabic ? 'رقم الفاتورة:' : 'Invoice No:';
-  const invoiceDateLabel = isArabic ? 'التاريخ:' : 'Date:';
-  
-  const valueSize = FS_SMALL;
-  
-  if (isArabic) {
-      // In Arabic, Label on the right, Value on the left
-      const noLabelW = arabicFont.widthOfTextAtSize(shapeArabic(invoiceNoLabel), valueSize);
-      drawText(invoiceNoLabel, PAGE_WIDTH - MARGIN, secondRowY, valueSize, latinBoldFont, COLOR_DARK, 'right');
-      drawText(data.invoiceNo || '', PAGE_WIDTH - MARGIN - noLabelW - 5, secondRowY, valueSize, latinBoldFont, COLOR_DARK, 'right');
-      
-      const dateLabelW = arabicFont.widthOfTextAtSize(shapeArabic(invoiceDateLabel), valueSize);
-      drawText(invoiceDateLabel, PAGE_WIDTH - MARGIN, secondRowY - 20, valueSize, latinBoldFont, COLOR_DARK, 'right');
-      drawText(data.invoiceDate || '', PAGE_WIDTH - MARGIN - dateLabelW - 5, secondRowY - 20, valueSize, latinBoldFont, COLOR_DARK, 'right');
-  } else {
-      // In English, Value on the right, Label on the left of the value
-      const valW = latinBoldFont.widthOfTextAtSize(data.invoiceNo || '', valueSize);
-      drawText(data.invoiceNo || '', PAGE_WIDTH - MARGIN, secondRowY, valueSize, latinBoldFont, COLOR_DARK, 'right');
-      drawText(invoiceNoLabel, PAGE_WIDTH - MARGIN - valW - 5, secondRowY, valueSize, latinBoldFont, COLOR_DARK, 'right');
-      
-      const dateValW = latinBoldFont.widthOfTextAtSize(data.invoiceDate || '', valueSize);
-      drawText(data.invoiceDate || '', PAGE_WIDTH - MARGIN, secondRowY - 20, valueSize, latinBoldFont, COLOR_DARK, 'right');
-      drawText(invoiceDateLabel, PAGE_WIDTH - MARGIN - dateValW - 5, secondRowY - 20, valueSize, latinBoldFont, COLOR_DARK, 'right');
-  }
+  // 2. Inner circle (very thick red border)
+  page.drawEllipse({ x:stampCx, y:stampCy, xScale:innerR, yScale:innerR, borderColor:RED, borderWidth:5.5, opacity:0 });
 
-  let currentY = secondRowY - 50;
-
-  // Draw line separator
-  page.drawLine({
-    start: { x: MARGIN, y: currentY },
-    end: { x: PAGE_WIDTH - MARGIN, y: currentY },
-    thickness: 2,
-    color: COLOR_DARK,
-  });
-
-  currentY -= 40;
-
-  // Items table header - Larger and professional
-  const tableHeaderY = currentY;
-  const tableHeaderHeight = 35;
-  const tableWidth = PAGE_WIDTH - 2 * MARGIN;
+  // 3. Masking rectangle to create the horizontal gap in the inner circle
+  const gAngle = -15; // rotation angle
+  const gRad   = gAngle * Math.PI / 180;
+  const cos    = Math.cos(gRad);
+  const sin    = Math.sin(gRad);
+  const maskW  = 56;
+  const maskH  = 17;
+  const rx     = stampCx - (maskW / 2) * cos + (maskH / 2) * sin;
+  const ry     = stampCy - (maskW / 2) * sin - (maskH / 2) * cos;
 
   page.drawRectangle({
-    x: MARGIN,
-    y: tableHeaderY - tableHeaderHeight,
-    width: tableWidth,
-    height: tableHeaderHeight,
-    color: COLOR_DARK,
+    x: rx,
+    y: ry,
+    width: maskW,
+    height: maskH,
+    color: rgb(1, 1, 1),
+    rotate: degrees(gAngle),
   });
 
-  const descLabel = isArabic ? 'الوصف' : 'Description';
-  const qtyLabel = isArabic ? 'الكمية' : 'Quantity';
-  const priceLabel = isArabic ? 'السعر' : 'Price';
-  const itemTotalLabel = isArabic ? 'الإجمالي' : 'Total';
-
-  // Column widths
-  const colWidths = [tableWidth * 0.45, tableWidth * 0.15, tableWidth * 0.2, tableWidth * 0.2];
-
-  if (isArabic) {
-    drawText(descLabel, PAGE_WIDTH - MARGIN - 15, tableHeaderY - 22, FS_HEADING, latinBoldFont, COLOR_WHITE, 'right');
-    drawText(qtyLabel, PAGE_WIDTH - MARGIN - colWidths[0] - 15, tableHeaderY - 22, FS_HEADING, latinBoldFont, COLOR_WHITE, 'right');
-    drawText(priceLabel, PAGE_WIDTH - MARGIN - colWidths[0] - colWidths[1] - 15, tableHeaderY - 22, FS_HEADING, latinBoldFont, COLOR_WHITE, 'right');
-    drawText(itemTotalLabel, MARGIN + 15, tableHeaderY - 22, FS_HEADING, latinBoldFont, COLOR_WHITE, 'left');
-  } else {
-    drawText(descLabel, MARGIN + 15, tableHeaderY - 22, FS_HEADING, latinBoldFont, COLOR_WHITE);
-    drawText(qtyLabel, MARGIN + colWidths[0] + 15, tableHeaderY - 22, FS_HEADING, latinBoldFont, COLOR_WHITE);
-    drawText(priceLabel, MARGIN + colWidths[0] + colWidths[1] + 15, tableHeaderY - 22, FS_HEADING, latinBoldFont, COLOR_WHITE);
-    drawText(itemTotalLabel, PAGE_WIDTH - MARGIN - 15, tableHeaderY - 22, FS_HEADING, latinBoldFont, COLOR_WHITE, 'right');
-  }
-
-  currentY -= tableHeaderHeight;
-
-  // Items rows - Taller and more spacious
-  const rowHeight = 40;
-
-  for (const item of data.items) {
-    page.drawRectangle({
-      x: MARGIN,
-      y: currentY - rowHeight,
-      width: tableWidth,
-      height: rowHeight,
-      color: COLOR_WHITE,
-    });
-
-    page.drawLine({
-      start: { x: MARGIN, y: currentY - rowHeight },
-      end: { x: PAGE_WIDTH - MARGIN, y: currentY - rowHeight },
-      thickness: 1,
-      color: COLOR_BORDER,
-    });
-
-    if (isArabic) {
-      drawText(item.description || '', PAGE_WIDTH - MARGIN - 15, currentY - 25, FS_NORMAL, arabicFont, rgb(0, 0, 0), 'right');
-      drawText(String(item.quantity), PAGE_WIDTH - MARGIN - colWidths[0] - 15, currentY - 25, FS_NORMAL, latinFont, rgb(0, 0, 0), 'right');
-      drawText(`${item.price.toFixed(2)} ${data.currency}`, PAGE_WIDTH - MARGIN - colWidths[0] - colWidths[1] - 15, currentY - 25, FS_NORMAL, latinFont, rgb(0, 0, 0), 'right');
-      drawText(`${item.total.toFixed(2)} ${data.currency}`, MARGIN + 15, currentY - 25, FS_NORMAL, latinBoldFont, rgb(0, 0, 0), 'left');
-    } else {
-      drawText(item.description || '', MARGIN + 15, currentY - 25, FS_NORMAL, latinFont, rgb(0, 0, 0));
-      drawText(String(item.quantity), MARGIN + colWidths[0] + 15, currentY - 25, FS_NORMAL, latinFont, rgb(0, 0, 0));
-      drawText(`${item.price.toFixed(2)} ${data.currency}`, MARGIN + colWidths[0] + colWidths[1] + 15, currentY - 25, FS_NORMAL, latinFont, rgb(0, 0, 0));
-      drawText(`${item.total.toFixed(2)} ${data.currency}`, PAGE_WIDTH - MARGIN - 15, currentY - 25, FS_NORMAL, latinBoldFont, rgb(0, 0, 0), 'right');
-    }
-
-    currentY -= rowHeight;
-  }
-
-  // Totals section - Larger and more prominent
-  currentY -= 30;
-
-  const subtotal = data.items.reduce((sum, item) => sum + item.total, 0);
-  const taxAmount = (subtotal * data.taxRate) / 100;
-  const total = subtotal + taxAmount;
-
-  const totalsWidth = 220;
-  const totalsX = isArabic ? MARGIN : PAGE_WIDTH - MARGIN - totalsWidth;
-
-  // Subtotal
-  page.drawRectangle({
-    x: totalsX,
-    y: currentY - 30,
-    width: totalsWidth,
-    height: 30,
-    color: COLOR_LIGHT_GRAY,
+  // 4. "GUARANTEE" text – centered, enlarged to size 10
+  const gText = "GUARANTEE";
+  const gSize = 10;
+  const gW    = medF.widthOfTextAtSize(gText, gSize);
+  page.drawText(gText, {
+    x: stampCx - (gW / 2) * cos + 3.3 * sin,
+    y: stampCy - (gW / 2) * sin - 3.3 * cos,
+    size: gSize, font: medF, color: RED, rotate: degrees(gAngle),
   });
 
-  const subtotalLabel = isArabic ? 'المجموع الفرعي:' : 'Subtotal:';
-  if (isArabic) {
-    drawText(subtotalLabel, totalsX + totalsWidth - 15, currentY - 20, FS_NORMAL, latinFont, rgb(0, 0, 0), 'right');
-    drawText(`${subtotal.toFixed(2)} ${data.currency}`, totalsX + 15, currentY - 20, FS_NORMAL, latinBoldFont, rgb(0, 0, 0), 'left');
-  } else {
-    drawText(subtotalLabel, totalsX + 15, currentY - 20, FS_NORMAL, latinFont, rgb(0, 0, 0));
-    drawText(`${subtotal.toFixed(2)} ${data.currency}`, totalsX + totalsWidth - 15, currentY - 20, FS_NORMAL, latinBoldFont, rgb(0, 0, 0), 'right');
-  }
-
-  currentY -= 30;
-
-  // Tax
-  page.drawRectangle({
-    x: totalsX,
-    y: currentY - 30,
-    width: totalsWidth,
-    height: 30,
-    color: COLOR_LIGHT_GRAY,
+  // 5. "100 %" – pulled inward to midpoint of widened gap (offset 33.5)
+  const ringOffset = 33.5;
+  const tText = "100 %";
+  const tSize = 8.5;
+  const tW    = medF.widthOfTextAtSize(tText, tSize);
+  page.drawText(tText, {
+    x: stampCx - (tW / 2) * cos + ringOffset * sin,
+    y: stampCy - (tW / 2) * sin + ringOffset * cos,
+    size: tSize, font: medF, color: RED, rotate: degrees(gAngle),
   });
 
-  const taxLabel = isArabic ? `الضريبة (${data.taxRate}%):` : `Tax (${data.taxRate}%):`;
-  if (isArabic) {
-    drawText(taxLabel, totalsX + totalsWidth - 15, currentY - 20, FS_NORMAL, latinFont, rgb(0, 0, 0), 'right');
-    drawText(`${taxAmount.toFixed(2)} ${data.currency}`, totalsX + 15, currentY - 20, FS_NORMAL, latinBoldFont, rgb(0, 0, 0), 'left');
-  } else {
-    drawText(taxLabel, totalsX + 15, currentY - 20, FS_NORMAL, latinFont, rgb(0, 0, 0));
-    drawText(`${taxAmount.toFixed(2)} ${data.currency}`, totalsX + totalsWidth - 15, currentY - 20, FS_NORMAL, latinBoldFont, rgb(0, 0, 0), 'right');
-  }
-
-  currentY -= 30;
-
-  // Total - Larger and dark background
-  page.drawRectangle({
-    x: totalsX,
-    y: currentY - 40,
-    width: totalsWidth,
-    height: 40,
-    color: COLOR_DARK,
+  // 6. "% 001" – bottom ring area (upside-down)
+  const bAngle = 180 + gAngle;
+  const bRad   = bAngle * Math.PI / 180;
+  const bText  = "% 001";
+  const bSize  = 8.5;
+  const bW     = medF.widthOfTextAtSize(bText, bSize);
+  page.drawText(bText, {
+    x: stampCx - (bW / 2) * Math.cos(bRad) + ringOffset * Math.sin(bRad),
+    y: stampCy - (bW / 2) * Math.sin(bRad) + ringOffset * Math.cos(bRad),
+    size: bSize, font: medF, color: RED, rotate: degrees(bAngle),
   });
 
-  const totalLabel = isArabic ? 'الإجمالي:' : 'Total:';
-  if (isArabic) {
-    drawText(totalLabel, totalsX + totalsWidth - 15, currentY - 25, FS_HEADING + 2, latinBoldFont, COLOR_WHITE, 'right');
-    drawText(`${total.toFixed(2)} ${data.currency}`, totalsX + 15, currentY - 25, FS_HEADING + 2, latinBoldFont, COLOR_WHITE, 'left');
-  } else {
-    drawText(totalLabel, totalsX + 15, currentY - 25, FS_HEADING + 2, latinBoldFont, COLOR_WHITE);
-    drawText(`${total.toFixed(2)} ${data.currency}`, totalsX + totalsWidth - 15, currentY - 25, FS_HEADING + 2, latinBoldFont, COLOR_WHITE, 'right');
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  SECTION 8 – FOOTER                                              ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+  const footerY = 30;
+  hl(page, ML, footerY+18, PAGE_W-MR, 0.5, LGRAY);
+
+  if (snap.companyName) {
+    dt(snap.companyName, ML,       footerY, { size:8, color:GRAY });
+    dt(snap.companyName, PAGE_W/2, footerY, { size:8, color:GRAY, align:"center", arabic: hasAr(snap.companyName) });
   }
-
-  currentY -= 60;
-
-  // Notes section with bullet points - Larger and more prominent
-  if (data.notes && data.notes.length > 0) {
-    const notesLabel = isArabic ? 'ملاحظات:' : 'Notes:';
-    drawText(notesLabel, isArabic ? PAGE_WIDTH - MARGIN : MARGIN, currentY, FS_HEADING, latinBoldFont, COLOR_DARK, isArabic ? 'right' : 'left');
-    currentY -= 25;
-
-    const notes = Array.isArray(data.notes) ? data.notes : [data.notes];
-    for (const note of notes) {
-      if (note && note.trim()) {
-        if (isArabic) {
-          drawText('•', PAGE_WIDTH - MARGIN, currentY, FS_NORMAL, latinFont, COLOR_DARK, 'right');
-          drawText(note.trim(), PAGE_WIDTH - MARGIN - 15, currentY, FS_NORMAL, arabicFont, rgb(0, 0, 0), 'right');
-        } else {
-          drawText('•', MARGIN, currentY, FS_NORMAL, latinFont, COLOR_DARK);
-          drawText(note.trim(), MARGIN + 20, currentY, FS_NORMAL, latinFont, rgb(0, 0, 0));
-        }
-        currentY -= 22;
-      }
-    }
-  }
-
-  currentY -= 40;
-
-  // Signature section
-  const signatureLabel = isArabic ? 'التوقيع:' : 'Signature:';
-  drawText(signatureLabel, isArabic ? PAGE_WIDTH - MARGIN : MARGIN, currentY, FS_HEADING, latinFont, COLOR_DARK, isArabic ? 'right' : 'left');
-
-  if (data.signatureType === 'image' && data.signatureData) {
-    try {
-      if (data.signatureData.startsWith('data:image')) {
-        const sigBytes = Buffer.from(data.signatureData.split(',')[1], 'base64');
-        const sigImage = await pdf.embedPng(sigBytes);
-        const sigDims = sigImage.scale(0.4);
-        page.drawImage(sigImage, {
-          x: isArabic ? PAGE_WIDTH - MARGIN - sigDims.width : MARGIN,
-          y: currentY - 70,
-          width: sigDims.width,
-          height: sigDims.height,
-        });
-      }
-    } catch (e) {
-      console.warn('Failed to embed signature image:', e);
-    }
-  } else if (data.signatureData) {
-    try {
-      const sigBytes = Buffer.from(data.signatureData.split(',')[1], 'base64');
-      const sigImage = await pdf.embedPng(sigBytes);
-      const sigDims = sigImage.scale(0.4);
-      page.drawImage(sigImage, {
-        x: isArabic ? PAGE_WIDTH - MARGIN - sigDims.width : MARGIN,
-        y: currentY - 70,
-        width: sigDims.width,
-        height: sigDims.height,
-      });
-    } catch (e) {
-      console.warn('Failed to embed manual signature:', e);
-    }
-  }
-
-  // Signature line
-  page.drawLine({
-    start: { x: isArabic ? PAGE_WIDTH - MARGIN - 200 : MARGIN, y: currentY - 75 },
-    end: { x: isArabic ? PAGE_WIDTH - MARGIN : MARGIN + 200, y: currentY - 75 },
-    thickness: 1,
-    color: COLOR_DARK,
-  });
-
-  // Footer - Professional
-  const footerY = 60;
-  page.drawLine({
-    start: { x: MARGIN, y: footerY + 25 },
-    end: { x: PAGE_WIDTH - MARGIN, y: footerY + 25 },
-    thickness: 1,
-    color: COLOR_BORDER,
-  });
-
-  const footerText = isArabic ? 'شكراً لتعاملكم معنا' : 'Thank you for your business';
-  drawText(footerText, PAGE_WIDTH / 2, footerY, FS_NORMAL, latinFont, COLOR_GRAY, 'center');
-
-  // Add invoice number in footer for reference
-  const refText = isArabic ? `رقم المرجع: ${data.invoiceNo}` : `Reference: ${data.invoiceNo}`;
-  drawText(refText, PAGE_WIDTH / 2, footerY - 15, FS_SMALL, latinFont, COLOR_GRAY, 'center');
+  dt("Page 1 of 1-",     PAGE_W-MR, footerY+9, { size:7.5, color:GRAY, align:"right" });
+  dt(data.invoiceNo||"", PAGE_W-MR, footerY,   { size:7.5, color:GRAY, align:"right" });
 
   return pdf.save();
 }
-
